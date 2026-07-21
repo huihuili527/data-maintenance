@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新能源监管平台 - A-6报警阈值信息维护</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: #f5f6fa;
+            min-height: 100vh; display: flex;
+        }
+
+        /* ========== 左侧导航栏 - 极简扁平化 ========== */
+        .sidebar {
+            width: 200px;
+            background: #1e1f26;
+            color: #8a8d99;
+            display: flex; flex-direction: column;
+            position: fixed; height: 100vh; left: 0; top: 0; z-index: 100;
+        }
+        .sidebar-logo {
+            padding: 24px 20px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .logo-area {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 10px;
+        }
+        .logo-icon {
+            width: 32px; height: 32px;
+            background: linear-gradient(135deg,#0e7ce6,#0958d9);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(14,124,230,0.3);
+        }
+        .logo-icon svg { width: 18px; height: 18px; stroke: white; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+        .logo-text {
+            font-size: 14px; font-weight: 700;
+            color: #e8eaef; letter-spacing: 0.8px;
+            line-height: 1.3;
+            white-space: nowrap;
+        }
+        .logo-subtitle {
+            font-size: 11.5px; font-weight: 500;
+            color: #6b7084; letter-spacing: 1.2px;
+            padding-left: 50px;
+            text-transform: uppercase;
+        }
+        .nav-header {
+            padding: 18px 16px 10px;
+            font-size: 11px; font-weight: 700;
+            letter-spacing: 1.5px; color: #555863;
+            text-transform: uppercase;
+        }
+
+        .sidebar-nav { flex: 1; padding: 0; overflow-y: auto; }
+
+        /* 一级菜单 - 可折叠 */
+        .nav-parent {
+            user-select: none;
+        }
+        .nav-parent-header {
+            display: flex; align-items: center; gap: 0;
+            padding: 11px 16px;
+            cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
+            font-size: 13px; font-weight: 600;
+            color: #dde1ea;
+            border-left: 3px solid transparent;
+        }
+        .nav-parent-header::before {
+            content: '▾';
+            font-size: 10px;
+            margin-right: 8px;
+            color: #787c8a;
+            transition: transform 0.2s ease, color 0.15s ease;
+            flex-shrink: 0;
+            display: inline-block;
+        }
+        .nav-parent-header:hover { background: rgba(255,255,255,0.05); color: #fff; }
+        .nav-parent.collapsed .nav-parent-header::before {
+            transform: rotate(-90deg);
+        }
+        .nav-parent.collapsed .nav-children { display: none; }
+
+        /* 二级子菜单 */
+        .nav-children { padding-left: 12px; }
+        .nav-item {
+            display: flex; align-items: center; gap: 0;
+            padding: 9px 16px 9px 28px;
+            cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
+            font-size: 13px; color: #bfc2cd;
+            border-left: 3px solid transparent;
+            position: relative;
+        }
+        .nav-item::before {
+            content: '▸';
+            font-size: 10px;
+            margin-right: 8px;
+            color: #787c8a;
+            transition: color 0.15s ease;
+            flex-shrink: 0;
+        }
+        .nav-item:hover { background: rgba(255,255,255,0.05); color: #dde1ea; }
+        .nav-item:hover::before { color: #b0b4c2; }
+
+        /* 扁平化选中态 */
+        .nav-item.active {
+            background: rgba(14,124,230,0.1);
+            color: #0e7ce6;
+            font-weight: 500;
+            border-left-color: #0e7ce6;
+        }
+        .nav-item.active::before { color: #0e7ce6; }
+
+        /* 页面区域显隐 */
+        .page-section { display: none; }
+        .page-section.active { display: block; }
+
+        .sidebar-footer { padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.03); font-size: 11px; color: #454754; text-align: center; }
+
+        /* ========== 主内容区 ========== */
+        .main-content { flex: 1; margin-left: 200px; display: flex; flex-direction: column; min-height: 100vh; }
+
+        /* ========== 顶部面包屑 ========== */
+        .top-header {
+            background: white; padding: 16px 32px;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #64748b; }
+        .breadcrumb a { color: #0e7ce6; text-decoration: none; transition: color 0.2s; }
+        .breadcrumb a:hover { color: #0958d9; text-decoration: underline; }
+        .breadcrumb .separator { color: #cbd5e1; }
+        .breadcrumb .current { color: #1e293b; font-weight: 600; }
+        .user-info { display: flex; align-items: center; gap: 8px; }
+        .user-avatar { width: 28px; height: 28px; border-radius: 4px; background: #0e7ce6; color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; }
+        .user-name { font-size: 13px; color: #555; font-weight: 400; }
+
+        /* ========== 页面标题 ========== */
+        .page-header { background: white; padding: 20px 32px; margin: 20px 24px 0; border-radius: 12px 12px 0 0; border-bottom: 1px solid #e2e8f0; }
+        .page-header h1 { font-size: 22px; color: #1e293b; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .page-header h1 .header-icon { color: #3b82f6; }
+        .page-header p { font-size: 13px; color: #94a3b8; margin-top: 4px; }
+
+        /* ========== 筛选栏 ========== */
+        .filter-bar {
+            background: white; padding: 18px 32px; margin: 20px 24px 0;
+            border-radius: 12px 12px 0 0; border-bottom: 1px solid #e2e8f0;
+            display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+        }
+        .filter-item { display: flex; align-items: center; gap: 8px; }
+        .filter-item label { font-size: 13px; font-weight: 600; color: #374151; white-space: nowrap; }
+        .filter-item select {
+            padding: 8px 14px; border: 2px solid #e2e8f0; border-radius: 7px;
+            font-size: 13px; min-width: 220px; background: #f8fafc;
+            cursor: pointer; transition: all 0.25s ease;
+        }
+        .filter-item select:focus { outline: none; border-color: #0e7ce6; background: white; box-shadow: 0 0 0 3px rgba(14,124,230,0.1); }
+        .btn-filter-query { padding: 7px 20px; background: #0e7ce6; color: white; border: 1px solid #0e7ce6; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 400; transition: all 0.15s ease; display: inline-flex; align-items: center; gap: 5px; box-shadow: none; letter-spacing: 0.3px; }
+        .btn-filter-query:hover { background: #0968c4; border-color: #0968c4; transform: none; }
+        .btn-filter-reset { padding: 7px 16px; background: transparent; color: #666; border: 1px solid #d1d5db; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 400; transition: all 0.15s ease; display: inline-flex; align-items: center; gap: 5px; }
+        .btn-filter-reset:hover { background: #f9fafb; border-color: #999; color: #333; }
+
+        /* ========== 工具栏 - 极简扁平化 ========== */
+        .toolbar { background: white; padding: 14px 32px; margin: 0 24px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-bottom: 1px solid #e8ecf1; }
+        .btn {
+            padding: 7px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 400;
+            transition: all 0.15s ease;
+            display: inline-flex; align-items: center; gap: 5px;
+            letter-spacing: 0.3px;
+        }
+        /* 主操作按钮 - 扁平纯色填充 */
+        .btn-primary {
+            background: #0e7ce6; color: white; border: 1px solid #0e7ce6;
+            box-shadow: none;
+        }
+        .btn-primary:hover { background: #0968c4; border-color: #0968c4; transform: none; }
+
+        /* 次要按钮 - 扁平边框 */
+        .btn-success {
+            background: transparent; color: #10b981; border: 1px solid #d1fae5;
+            box-shadow: none;
+        }
+        .btn-success:hover { background: #ecfdf5; border-color: #10b981; transform: none; }
+        .btn-warning {
+            background: transparent; color: #d97706; border: 1px solid #fef3c7;
+            box-shadow: none;
+        }
+        .btn-warning:hover { background: #fffbeb; border-color: #d97706; transform: none; }
+        .btn-outline {
+            background: transparent; color: #555; border: 1px solid #d1d5db;
+        }
+        .btn-outline:hover { background: #f9fafb; border-color: #999; color: #333; }
+        .btn-info {
+            background: transparent; color: #6366f1; border: 1px solid #e0e7ff;
+            box-shadow: none;
+        }
+        .btn-info:hover { background: #eef2ff; border-color: #6366f1; transform: none; }
+        .search-box { margin-left: auto; position: relative; }
+        .search-box input { width: 240px; padding: 9px 16px 9px 38px; border: 2px solid #e2e8f0; border-radius: 7px; font-size: 13px; transition: all 0.25s ease; background: #f8fafc; }
+        .search-box input:focus { outline: none; border-color: #0e7ce6; background: white; box-shadow: 0 0 0 3px rgba(14,124,230,0.12); }
+        .search-box::before { content: "🔍"; position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 13px; }
+
+        /* ========== 表格区域 - 无底色 ========== */
+        .table-container { background: transparent; margin: 0 24px; overflow-x: auto; flex: 1; }
+        table { width: 100%; border-collapse: separate; border-spacing: 0; background: transparent; min-width: 2200px; }
+        thead {
+            background: transparent;
+            color: #1e293b;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        th {
+            padding: 14px 10px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 12.5px;
+            vertical-align: middle;
+            border-right: 1px solid #e8ecf1;
+            border-bottom: 2px solid #0e7ce6;
+            white-space: nowrap;
+            color: #334155;
+            background: transparent;
+        }
+        th:last-child { border-right: none; }
+        td {
+            padding: 11px 8px;
+            border-bottom: 1px solid #eef1f6;
+            border-right: 1px solid #f5f7fa;
+            font-size: 12px;
+            color: #4a5568;
+            text-align: center;
+            vertical-align: middle;
+            background: transparent;
+        }
+        td:last-child { border-right: none; }
+        tr:hover td { }
+        tr:hover td:first-child { }
+
+        /* 报警值合并单元格 */
+        .alarm-value-cell {
+            display: inline-block; padding: 5px 10px;
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px;
+            font-family: 'Consolas','Monaco','Courier New',monospace;
+            font-size: 11.5px; color: #334155; letter-spacing: 0.3px;
+            min-width: 140px; word-break: keep-all; cursor: default;
+        }
+        .alarm-value-cell:hover { background: #e8f3fe; border-color: #6db3f7; }
+
+        td input[type="text"], td select { padding: 5px 10px; border: 1.5px solid #e2e8f0; border-radius: 5px; font-size: 11.5px; text-align: center; transition: all 0.2s ease; background: transparent; width: auto; }
+        td input:focus, td select:focus { outline: none; border-color: #0e7ce6; background: white; box-shadow: 0 0 0 2px rgba(14,124,230,0.1); }
+
+        .field-name { font-weight: 500; color: #1e293b; font-size: 12px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .action-btns { display: flex; gap: 4px; justify-content: center; }
+        .action-btn {
+            padding: 3px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 3px;
+            cursor: pointer; transition: all 0.15s ease;
+            font-size: 12px;
+            display: inline-flex; align-items: center;
+            background: transparent; color: #555;
+            line-height: 1.4;
+        }
+        .action-btn.edit { border-color: #93c5fd; color: #0e7ce6; }
+        .action-btn.edit:hover { background: #e8f3fe; border-color: #0e7ce6; }
+        .action-btn.delete { border-color: #fecaca; color: #dc2626; }
+        .action-btn.delete:hover { background: #fee2e2; border-color: #dc2626; }
+        .status-badge { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .status-active { background: #e8f3fe; color: #0958d9; }
+        .status-pending { background: #fef3c7; color: #b45309; }
+        .time-text { color: #64748b; font-size: 12px; }
+        .operator-text { color: #334155; font-weight: 500; font-size: 12px; }
+
+        /* ========== 分页 ========== */
+        .pagination { padding: 18px 32px; display: flex; justify-content: space-between; align-items: center; background: white; margin: 0 24px 24px; border-radius: 0 0 12px 12px; border-top: 1px solid #e2e8f0; }
+        .pagination-info { color: #64748b; font-size: 13px; }
+        .pagination-btns { display: flex; gap: 6px; }
+        .page-btn { width: 36px; height: 36px; border: 2px solid #e2e8f0; background: white; border-radius: 7px; cursor: pointer; font-weight: 600; color: #475569; transition: all 0.2s ease; font-size: 13px; }
+        .page-btn:hover, .page-btn.active { background: #0e7ce6; color: white; border-color: #0e7ce6; }
+
+        /* ========== 弹窗 ========== */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.65); backdrop-filter: blur(4px); z-index: 1000; justify-content: center; align-items: center; }
+        .modal.show { display: flex; }
+        .modal-content { background: white; border-radius: 16px; padding: 28px; max-width: 1200px; width: 92%; max-height: 88vh; overflow-y: auto; box-shadow: 0 25px 80px rgba(0,0,0,0.25); animation: modalSlideIn 0.3s ease; }
+        @keyframes modalSlideIn { from { opacity:0; transform:translateY(-20px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e8f3fe; }
+        .modal-header h2 { font-size: 20px; color: #1e293b; display: flex; align-items: center; gap: 10px; }
+        .close-btn { width: 34px; height: 34px; border: none; background: #f1f5f9; border-radius: 50%; cursor: pointer; font-size: 17px; color: #64748b; transition: all 0.2s ease; }
+        .close-btn:hover { background: #fee2e2; color: #dc2626; }
+
+        .form-section { margin-bottom: 24px; }
+        .form-section-title { font-size: 14px; font-weight: 700; color: #0958d9; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 2px solid #a8c9f0; display: flex; align-items: center; gap: 8px; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 12px; font-weight: 600; color: #374151; display: flex; align-items: center; gap: 4px; }
+        .form-group label .required { color: #dc2626; }
+        .form-group input, .form-group select, .form-group textarea { padding: 10px 14px; border: 2px solid #e2e8f0; border-radius: 7px; font-size: 13px; transition: all 0.2s ease; }
+        .form-group textarea { resize: vertical; min-height: 70px; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #0e7ce6; box-shadow: 0 0 0 3px rgba(14,124,230,0.1); }
+
+        /* 报警字段组样式 */
+        .alarm-field-group { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; grid-column: span 2; }
+        .alarm-field-label { font-size: 13px; font-weight: 700; color: #0958d9; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+        .alarm-field-label .required { color: #dc2626; }
+        .alarm-inputs-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+        .alarm-input-pair { display: flex; align-items: center; gap: 6px; }
+        .alarm-input-pair label { font-size: 11px; font-weight: 600; color: #64748b; white-space: nowrap; }
+        .alarm-input-pair.level-1 label { color: #d97706; }
+        .alarm-input-pair.level-2 label { color: #ea580c; }
+        .alarm-input-pair.level-3 label { color: #dc2626; }
+        .alarm-input-pair input { width: 80px; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 12px; text-align: center; }
+        .alarm-input-pair input:focus { outline: none; border-color: #0e7ce6; }
+        .modal-footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid #e8ecf1; display: flex; justify-content: flex-end; gap: 8px; }
+
+        /* Toast */
+        .toast { position: fixed; top: 24px; right: 24px; background: white; padding: 14px 22px; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); display: none; align-items: center; gap: 10px; z-index: 2000; animation: toastSlideIn 0.3s ease; border-left: 4px solid #0e7ce6; }
+        .toast.show { display: flex; }
+        @keyframes toastSlideIn { from{opacity:0;transform:translateX(80px);} to{opacity:1;transform:translateX(0);} }
+        .toast.success{border-left-color:#10b981;} .toast.error{border-left-color:#ef4444;} .toast.info{border-left-color:#0e7ce6;}
+        #fileInput { display: none; }
+        .empty-state { text-align: center; padding: 60px 20px; color: #94a3b8; }
+        .empty-state .icon { font-size: 36px; margin-bottom: 12px; opacity: 0.5; }
+        .empty-state h3 { font-size: 17px; color: #64748b; margin-bottom: 6px; }
+        .empty-state p { font-size: 13px; }
+
+        ::-webkit-scrollbar{width:6px;height:6px;} ::-webkit-scrollbar-track{background:#f1f5f9;border-radius:3px;} ::-webkit-scrollbar-thumb{background:#94a3b8;border-radius:3px;} ::-webkit-scrollbar-thumb:hover{background:#64748b;}
+    </style>
+</head>
+<body>
+    <!-- 左侧导航栏 -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                </div>
+                <span class="logo-text">新能源监管平台</span>
+            </div>
+            <div class="logo-subtitle">数据维护系统</div>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-parent" id="navDataMaintain">
+                <div class="nav-parent-header" onclick="toggleNavParent('navDataMaintain')">数据维护</div>
+                <div class="nav-children">
+                    <div class="nav-item active" onclick="switchPage('alarm', this)">报警阈值信息</div>
+                    <div class="nav-item" onclick="switchPage('vehicle', this)">车型配置信息</div>
+                </div>
+            </div>
+        </nav>
+        <div class="sidebar-footer">v2.0.1 &copy; 2026</div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="main-content">
+        <!-- 顶部面包屑 -->
+        <header class="top-header">
+            <div class="breadcrumb"><a href="#" onclick="toggleNavParent('navDataMaintain');return false;">数据维护</a><span class="separator">/</span><span class="current" id="breadcrumbCurrent">报警阈值信息</span></div>
+            <div class="user-info"><span class="user-name">管理员</span><div class="user-avatar">A</div></div>
+        </header>
+
+        <!-- ========== 页面1: 报警阈值信息 ========== -->
+        <div class="page-section active" id="pageAlarm">
+        <!-- 筛选栏 + 工具栏 -->
+        <div class="filter-bar">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;width:100%;">
+                <div class="filter-item">
+                    <label>车辆配置名称</label>
+                    <select id="filterVehicleName" onchange="onFilterChange()">
+                        <option value="">全部</option>
+                    </select>
+                </div>
+                <button class="btn-filter-query" onclick="queryData()">查 询</button>
+                <button class="btn-filter-reset" onclick="resetFilter()">重 置</button>
+                <button class="btn btn-primary" onclick="openModal()">+ 新增</button>
+                <button class="btn btn-success" onclick="downloadTemplate()">模板下载</button>
+                <button class="btn btn-warning" onclick="document.getElementById('fileInput').click()">导入数据</button>
+                <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="importData(event)">
+                <button class="btn btn-outline" onclick="exportData()">导出数据</button>
+            </div>
+        </div>
+
+        <!-- 数据表格 -->
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:46px;">序号</th>
+                        <th style="width:130px;">车辆配置名称</th>
+                        <th>规约</th>
+                        <th>温度差异报警(℃)</th>
+                        <th>电池高温报警(℃)</th>
+                        <th>车载储能装置类型过压报警(V)</th>
+                        <th>车载储能装置类型欠压报警(V)</th>
+                        <th>SOC低报警(%)</th>
+                        <th>最小并联单元过压报警(V)</th>
+                        <th>最小并联单元欠压报警(V)</th>
+                        <th>SOC过高报警(%)</th>
+                        <th>SOC跳变报警(%)</th>
+                        <th>最小并联单元一致性差报警(Mv)</th>
+                        <th>绝缘电阻失效报警(kΩ)</th>
+                        <th>DC-DC温度报警(℃)</th>
+                        <th>驱动电机控制器温度报警(℃)</th>
+                        <th>驱动电机温度报警(℃)</th>
+                        <th>车载储能装置类型过充报警(V)</th>
+                        <th>驱动电机超速报警(r/s)</th>
+                        <th>驱动电机过流报警(A)</th>
+                        <th style="width:150px;">可充电储能热事件报警</th>
+                        <th>总电压计算方式</th>
+                        <th>驱动电机最大工作电流(A)</th>
+                        <th>是否上传国家平台</th>
+                        <th style="width:140px;">更新时间</th>
+                        <th style="width:80px;">操作人</th>
+                        <th style="width:80px;">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+
+        <!-- 分页 -->
+        <div class="pagination">
+            <div class="pagination-info">共 <strong id="totalRecords">0</strong> 条记录，每页显示 10 条</div>
+            <div class="pagination-btns">
+                <button class="page-btn" onclick="changePage('prev')">◀</button>
+                <button class="page-btn active">1</button>
+                <button class="page-btn">2</button>
+                <button class="page-btn">3</button>
+                <button class="page-btn" onclick="changePage('next')">▶</button>
+            </div>
+        </div>
+        </div><!-- /pageAlarm -->
+
+        <!-- ========== 页面2: 车型配置信息 ========== -->
+        <div class="page-section" id="pageVehicle">
+        <!-- 筛选栏 + 工具栏 -->
+        <div class="filter-bar">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;width:100%;">
+                <div class="filter-item">
+                    <label>车辆型号</label>
+                    <select id="filterVModel" onchange="onFilterChangeV()">
+                        <option value="">全部</option>
+                    </select>
+                </div>
+                <button class="btn-filter-query" onclick="queryDataV()">查 询</button>
+                <button class="btn-filter-reset" onclick="resetFilterV()">重 置</button>
+                <button class="btn btn-primary" onclick="openModalV()">+ 新增</button>
+                <button class="btn btn-success" onclick="downloadTemplateV()">模板下载</button>
+                <button class="btn btn-warning" onclick="openImportDialogV()">导入数据</button>
+                <button class="btn btn-outline" onclick="exportDataV()">导出数据</button>
+                <label class="btn btn-info">上传检验文档
+                    <input type="file" id="uploadInspectDoc" accept=".pdf,.doc,.docx,.xlsx,.xls" multiple style="display:none;" onchange="handleInspectDocUpload(event)">
+                </label>
+            </div>
+        </div>
+
+        <!-- 数据表格 -->
+        <div class="table-container" style="min-width:4200px;">
+            <table style="min-width:4200px;">
+                <thead>
+                    <tr>
+                        <th style="width:46px;">序号</th>
+                        <th style="width:120px;">车辆企业</th>
+                        <th style="width:130px;">车辆型号</th>
+                        <th>产品名称</th>
+                        <th>通用名称</th>
+                        <th>检测机构</th>
+                        <th style="width:140px;">车型检验报告编号</th>
+                        <th style="width:140px;">车型检验报告文档</th>
+                        <th style="width:130px;">车辆配置名称</th>
+                        <th>公告批次</th>
+                        <th style="width:100px;">发布日期</th>
+                        <th>最高车速(Km/h)</th>
+                        <th>规约</th>
+                        <th>电池种类</th>
+                        <th>动力方式</th>
+                        <th>驱动电机种类</th>
+                        <th>续驶里程检测方式</th>
+                        <th>纯电续驶里程(Km)</th>
+                        <th>额定电压(V)</th>
+                        <th>总储电量(Kwh)</th>
+                        <th>储能装置串并联方式</th>
+                        <th>各挡位传动比</th>
+                        <th>是否换电车辆</th>
+                        <th>是否增程车辆</th>
+                        <th>签名算法</th>
+                        <th>车重(kg)</th>
+                        <th>车长(mm)</th>
+                        <th>车宽(mm)</th>
+                        <th>车高(mm)</th>
+                        <th>电池包(箱)型号</th>
+                        <th>电池包(箱)数量</th>
+                        <th>储能装置总能量(kwh)</th>
+                        <th>储能装置冷却方式</th>
+                        <th>储能装置串并联方式</th>
+                        <th>储能装置位置</th>
+                        <th>驱动电机型号</th>
+                        <th>驱动电机位置</th>
+                        <th>驱动电机冷却方式</th>
+                        <th>电机额定电压(V)</th>
+                        <th>电机峰值功率(KW)</th>
+                        <th>电机最高转速(r/min)</th>
+                        <th>电机峰值转矩(Nm)</th>
+                        <th>电机最大输出转矩(Nm)</th>
+                        <th>终端型号</th>
+                        <th>终端品牌</th>
+                        <th>发动机型号</th>
+                        <th>燃油类型</th>
+                        <th>燃油标号</th>
+                        <th>最大输出功率(KW)</th>
+                        <th>最大输出转矩(Nm)</th>
+                        <th>是否上传国家平台</th>
+                        <th style="width:140px;">更新时间</th>
+                        <th style="width:80px;">操作人</th>
+                        <th style="width:80px;">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBodyV"></tbody>
+            </table>
+        </div>
+
+        <!-- 分页 -->
+        <div class="pagination">
+            <div class="pagination-info">共 <strong id="totalRecordsV">0</strong> 条记录，每页显示 10 条</div>
+            <div class="pagination-btns">
+                <button class="page-btn" onclick="changePage('prev')">◀</button>
+                <button class="page-btn active">1</button>
+                <button class="page-btn">2</button>
+                <button class="page-btn">3</button>
+                <button class="page-btn" onclick="changePage('next')">▶</button>
+            </div>
+        </div>
+        </div><!-- /pageVehicle -->
+    </main>
+
+    <!-- 新增/编辑弹窗 -->
+    <div class="modal" id="dataModal">
+        <div class="modal-content">
+            <div class="modal-header"><h2 id="modalTitle">新增报警阈值配置</h2><button class="close-btn" onclick="closeModal()">✕</button></div>
+
+            <!-- 基本信息 -->
+            <div class="form-section">
+                <div class="form-section-title">基本信息</div>
+                <div class="form-grid">
+                    <div class="form-group"><label>车辆配置名称 <span class="required">*</span></label><input type="text" id="vehicleName" placeholder="请输入车辆配置名称"></div>
+                    <div class="form-group"><label>规约 <span class="required">*</span></label><select id="protocol"><option value="">请选择</option><option value="GB/T 32960-2016">GB/T 32960-2016</option><option value="GB/T 32960-2025">GB/T 32960-2025</option></select></div>
+                </div>
+            </div>
+
+            <!-- 温度类 -->
+            <div class="form-section">
+                <div class="form-section-title">温度类报警阈值</div>
+                <div class="form-grid">
+                    <div class="alarm-field-group"><div class="alarm-field-label">温度差异报警(℃) <span class="required">*</span></div><div class="alarm-inputs-row"><div class="alarm-input-pair level-1"><label>1级:</label><input type="number" id="tempDiff_l1_min" placeholder="下限" step="0.1"><input type="number" id="tempDiff_l1_max" placeholder="上限" step="0.1"></div><div class="alarm-input-pair level-2"><label>2级:</label><input type="number" id="tempDiff_l2_min" placeholder="下限" step="0.1"><input type="number" id="tempDiff_l2_max" placeholder="上限" step="0.1"></div><div class="alarm-input-pair level-3"><label>3级:</label><input type="number" id="tempDiff_l3_min" placeholder="下限" step="0.1"><input type="number" id="tempDiff_l3_max" placeholder="上限" step="0.1"></div></div></div>
+                    <div class="alarm-field-group"><div class="alarm-field-label">电池高温报警(℃) <span class="required">*</span></div><div class="alarm-inputs-row"><div class="alarm-input-pair level-1"><label>1级:</label><input type="number" id="batteryHighTemp_l1_min" placeholder="下限" step="0.1"><input type="number" id="batteryHighTemp_l1_max" placeholder="上限" step="0.1"></div><div class="alarm-input-pair level-2"><label>2级:</label><input type="number" id="batteryHighTemp_l2_min" placeholder="下限" step="0.1"><input type="number" id="batteryHighTemp_l2_max" placeholder="上限" step="0.1"></div><div class="alarm-input-pair level-3"><label>3级:</label><input type="number" id="batteryHighTemp_l3_min" placeholder="下限" step="0.1"><input type="number" id="batteryHighTemp_l3_max" placeholder="上限" step="0.1"></div></div></div>
+                    <div class="alarm-field-group"><div class="alarm-field-label">DC-DC温度报警(℃) <span class="required">*</span></div><div class="alarm-inputs-row"><div class="alarm-input-pair level-1"><label>1级:</label><input type="number" id="dcDcTemp_l1_min" placeholder="下限" step="0.1"><input type="number" id="dcDcTemp_l1_max" placeholder="上限" step="0.1"></div><div class="alarm-input-pair level-2"><label>2级:</label><input type="number" id="dcDcTemp_l2_min" placeholder="下限" step="0.1"><input type="number" id="dcDcTemp_l2_max" placeholder="上限" step="0.1"></div><div class="alarm-input-pair level-3"><label>3级:</label><input type="number" id="dcDcTemp_l3_min" placeholder="下限" step="0.1"><input type="number" id="dcDcTemp_l3_max" placeholder="上限" step="0.1"></div></div></div>
+                    <div class="alarm-field-group"><div class="alarm-field-label">驱动电机控制器温度报警(℃) <span class="required">*</span></div><div class="alarm-inputs-row"><div class="alarm-input-pair level-1"><label>1级:</label><input type="number" id="motorCtrlTemp_l1_min" placeholder="下限" step="0.1"><input type="number" id="motorCtrlTemp_l1_max" placeholder="上限" step="0.1"></div><div class="alarm-input-pair level-2"><label>2级:</label><input type="number" id="motorCtrlTemp_l2_min" placeholder="下限" step="0.1"><input type="number" id="motorCtrlTemp_l2_max" placeholder="上限" step="0.1"></div><div class="alarm-input-pair level-3"><label>3级:</label><input type="number" id="motorCtrlTemp_l3_min" placeholder="下限" step="0.1"><input type="number" id="motorCtrlTemp_l3_max" placeholder="上限" step="0.1"></div></div></div>
+                    <div class="alarm-field-group"><div class="alarm-field-label">驱动电机温度报警(℃) <span class="required">*</span></div><div class="alarm-inputs-row"><div class="alarm-input-pair level-1"><label>1级:</label><input type="number" id="motorTemp_l1_min" placeholder="下限" step="0.1"><input type="number" id="motorTemp_l1_max" placeholder="上限" step="0.1"></div><div class="alarm-input-pair level-2"><label>2级:</label><input type="number" id="motorTemp_l2_min" placeholder="下限" step="0.1"><input type="number" id="motorTemp_l2_max" placeholder="上限" step="0.1"></div><div class="alarm-input-pair level-3"><label>3级:</label><input type="number" id="motorTemp_l3_min" placeholder="下限" step="0.1"><input type="number" id="motorTemp_l3_max" placeholder="上限" step="0.1"></div></div></div>
+                </div>
+            </div>
+
+            <!-- 电压类 -->
+            <div class="form-section">
+                <div class="form-section-title">电压类报警阈值</div>
+                <div class="form-grid">
+                    <div class="alarm-field-group"><div class="alarm-field-label">车载储能装置过压报警(V) <span class="required">*</span></div><div class="alarm-inputs-row"><div class="alarm-input-pair level-1"><label>1级:</label><input type="number" id="storageOverV_l1_min" placeholder="下限" step="0.01"><input type="number" id="storageOverV_l1_max" placeholder="上限" step="0.01"></div><div class="alarm-input-pair level-2"><label>2级:</label><input type="number" id="storageOverV_l2_min" placeholder="下限" step="0.01"><input type="number" id="storageOverV_l2_max" placeholder="上限" step="0.01"></div><div class="alarm-input-pair level-3"><label>3级:</label><input type="number" id="storageOverV_l3_min" placeholder="下限" step="0.01"><input type="number" id="storageOverV_l3_max" placeholder="上限" step="0.01"></div></div></div>
+                    <div class="alarm-field-group"><div class="alarm-field-label">车载储能装置欠压报警(V) <span class="required">*</span></div><div class="alarm-inputs-row"><div class="alarm-input-pair level-1"><label>1级:</label><input type="number" id="storageUnderV_l1_min" placeholder="下限" step="0.01"><input type="number" id="storageUnderV_l1_max" placeholder="上限" step="0.01"></div><div class="alarm-input-pair level-2"><label>2级:</label><input type="number" id="storageUnderV_l2_min" placeholder="下限" step="0.01"><input type="number" id="storageUnderV_l2_max" placeholder="上限" step="0.01"></div><div class="alarm-input-pair level-3"><label>3级:</label><input type="number" id="storageUnderV_l3_min" placeholder="下限" step="0.01"><input type="number" id="storageUnderV_l3_max" placeholder="上限" step="0.01"></div></div></div>
+                    <div class="alarm-field-group"><div class="alarm-field-label">最小并联单元过压报警(V) <span class="required">*</span></div><div class="alarm-inputs-row"><div class="alarm-input-pair level-1"><label>1级:</label><input type="number" id="parallelOverV_l1_min" placeholder="下限" step="0.001"><input type="number" id="parallelOverV_l1_max" placeholder="上限" step="0.001"></div><div class="alarm-input-pair level-2"><label>2级:</label><input type="number" id="parallelOverV_l2_min" placeholder="下限" step="0.001"><input type="number" id="parallelOverV_l2_max" placeholder="上限" step="0.001"></div><div class="alarm-input-pair level-3"><label>3级:</label><input type="number" id="parallelOverV_l3_min" placeholder="下限" step="0.001"><input type="number" id="parallelOverV_l3_max" placeholder="上限" step="0.001"></div></div></div>
+                    <div class="alarm-field-group"><div class="alarm-field-label">最小并联单元欠压报警(V) <span class="required">*</span></div><div class="alarm-inputs-row"><div class="alarm-input-pair level-1"><label>1级:</label><input type="number" id="parallelUnderV_l1_min" placeholder="下限" step="0.001"><input type="number" id="parallelUnderV_l1_max" placeholder="上限" step="0.001"></div><div class="alarm-input-pair level-2"><label>2级:</label><input type="number" id="parallelUnderV_l2_min" placeholder="下限" step="0.001"><input type="number" id="parallelUnderV_l2_max" placeholder="上限" step="0.001"></div><div class="alarm-input-pair level-3"><label>3级:</label><input type="number" id="parallelUnderV_l3_min" placeholder="下限" step="0.001"><input type="number" id="parallelUnderV_l3_max" placeholder="上限" step="0.001"></div></div></div>
+                    <div class="alarm-field-group"><div class="alarm-field-label">车载储能装置过充报警(V) <span class="required">*</span></div><div class="alarm-inputs-row"><div class="alarm-input-pair level-1"><label>1级:</label><input type="number" id="storageOverCharge_l1_min" placeholder="下限" step="0.01"><input type="number" id="storageOverCharge_l1_max" placeholder="上限" step="0.01"></div><div class="alarm-input-pair level-2"><label>2级:</label><input type="number" id="storageOverCharge_l2_min" placeholder="下限" step="0.01"><input type="number" id="storageOverCharge_l2_max" placeholder="上限" step="0.01"></div><div class="alarm-input-pair level-3"><label>3级:</label><input type="number" id="storageOverCharge_l3_min" placeholder="下限" step="0.01"><input type="number" id="storageOverCharge_l3_max" placeholder="上限" step="0.01"></div></div></div>
+                </div>
+            </div>
+
+            <!-- SOC类 -->
+            <div class="form-section">
+                <div class="form-section-title">SOC类报警阈值</div>
+                <div class="form-grid">
+                    <div class="alarm-field-group"><div class="alarm-field-label">SOC低报警(%) <span class="required">*</span></div><div class="alarm-inputs-row"><div class="alarm-input-pair level-1"><label>1级:</label><input type="number" id="socLow_l1_min" placeholder="下限" step="1" min="0" max="100"><input type="number" id="socLow_l1_max" placeholder="上限" step="1" min="0" max="100"></div><div class="alarm-input-pair level-2"><label>2级:</label><input type="number" id="socLow_l2_min" placeholder="下限" step="1" min="0" max="100"><input type="number" id="socLow_l2_max" placeholder="上限" step="1" min="0" max="100"></div><div class="alarm-input-pair level-3"><label>3级:</label><input type="number" id="socLow_l3_min" placeholder="下限" step="1" min="0" max="100"><input type="number" id="socLow_l3_max" placeholder="上限" step="1" min="0" max="100"></div></div></div>
+                    <div class="alarm-field-group"><div class="alarm-field-label">SOC过高报警(%) <span class="required">*</span></div><div class="alarm-inputs-row"><div class="alarm-input-pair level-1"><label>1级:</label><input type="number" id="socHigh_l1_min" placeholder="下限" step="1" min="0" max="100"><input type="number" id="socHigh_l1_max" placeholder="上限" step="1" min="0" max="100"></div><div class="alarm-input-pair level-2"><label>2级:</label><input type="number" id="socHigh_l2_min" placeholder="下限" step="1" min="0" max="100"><input type="number" id="socHigh_l2_max" placeholder="上限" step="1" min="0" max="100"></div><div class="alarm-input-pair level-3"><label>3级:</label><input type="number" id="socHigh_l3_min" placeholder="下限" step="1" min="0" max="100"><input type="number" id="socHigh_l3_max" placeholder="上限" step="1" min="0" max="100"></div></div></div>
+                    <div class="alarm-field-group"><div class="alarm-field-label">SOC跳变报警(%) <span class="required">*</span></div><div class="alarm-inputs-row"><div class="alarm-input-pair level-1"><label>1级:</label><input type="number" id="socJump_l1_min" placeholder="下限" step="1" min="0" max="100"><input type="number" id="socJump_l1_max" placeholder="上限" step="1" min="0" max="100"></div><div class="alarm-input-pair level-2"><label>2级:</label><input type="number" id="socJump_l2_min" placeholder="下限" step="1" min="0" max="100"><input type="number" id="socJump_l2_max" placeholder="上限" step="1" min="0" max="100"></div><div class="alarm-input-pair level-3"><label>3级:</label><input type="number" id="socJump_l3_min" placeholder="下限" step="1" min="0" max="100"><input type="number" id="socJump_l3_max" placeholder="上限" step="1" min="0" max="100"></div></div></div>
+                </div>
+            </div>
+
+            <!-- 其他 -->
+            <div class="form-section">
+                <div class="form-section-title">其他报警阈值</div>
+                <div class="form-grid">
+                    <div class="alarm-field-group"><div class="alarm-field-label">最小并联单元一致性差报警(Mv) <span class="required">*</span></div><div class="alarm-inputs-row"><div class="alarm-input-pair level-1"><label>1级:</label><input type="number" id="parallelDiff_l1_min" placeholder="下限" step="1"><input type="number" id="parallelDiff_l1_max" placeholder="上限" step="1"></div><div class="alarm-input-pair level-2"><label>2级:</label><input type="number" id="parallelDiff_l2_min" placeholder="下限" step="1"><input type="number" id="parallelDiff_l2_max" placeholder="上限" step="1"></div><div class="alarm-input-pair level-3"><label>3级:</label><input type="number" id="parallelDiff_l3_min" placeholder="下限" step="1"><input type="number" id="parallelDiff_l3_max" placeholder="上限" step="1"></div></div></div>
+                    <div class="alarm-field-group"><div class="alarm-field-label">绝缘电阻失效报警(kΩ) <span class="required">*</span></div><div class="alarm-inputs-row"><div class="alarm-input-pair level-1"><label>1级:</label><input type="number" id="insulation_l1_min" placeholder="下限" step="1"><input type="number" id="insulation_l1_max" placeholder="上限" step="1"></div><div class="alarm-input-pair level-2"><label>2级:</label><input type="number" id="insulation_l2_min" placeholder="下限" step="1"><input type="number" id="insulation_l2_max" placeholder="上限" step="1"></div><div class="alarm-input-pair level-3"><label>3级:</label><input type="number" id="insulation_l3_min" placeholder="下限" step="1"><input type="number" id="insulation_l3_max" placeholder="上限" step="1"></div></div></div>
+                    <div class="alarm-field-group"><div class="alarm-field-label">驱动电机超速报警(r/s) <span class="required">*</span></div><div class="alarm-inputs-row"><div class="alarm-input-pair level-1"><label>1级:</label><input type="number" id="motorOverSpeed_l1_min" placeholder="下限" step="1"><input type="number" id="motorOverSpeed_l1_max" placeholder="上限" step="1"></div><div class="alarm-input-pair level-2"><label>2级:</label><input type="number" id="motorOverSpeed_l2_min" placeholder="下限" step="1"><input type="number" id="motorOverSpeed_l2_max" placeholder="上限" step="1"></div><div class="alarm-input-pair level-3"><label>3级:</label><input type="number" id="motorOverSpeed_l3_min" placeholder="下限" step="1"><input type="number" id="motorOverSpeed_l3_max" placeholder="上限" step="1"></div></div></div>
+                    <div class="alarm-field-group"><div class="alarm-field-label">驱动电机过流报警(A) <span class="required">*</span></div><div class="alarm-inputs-row"><div class="alarm-input-pair level-1"><label>1级:</label><input type="number" id="motorOverCurrent_l1_min" placeholder="下限" step="1"><input type="number" id="motorOverCurrent_l1_max" placeholder="上限" step="1"></div><div class="alarm-input-pair level-2"><label>2级:</label><input type="number" id="motorOverCurrent_l2_min" placeholder="下限" step="1"><input type="number" id="motorOverCurrent_l2_max" placeholder="上限" step="1"></div><div class="alarm-input-pair level-3"><label>3级:</label><input type="number" id="motorOverCurrent_l3_min" placeholder="下限" step="1"><input type="number" id="motorOverCurrent_l3_max" placeholder="上限" step="1"></div></div></div>
+                    <div class="form-group"><label>可充电储能装置热事件报警 <span class="required">*</span></label><textarea id="thermalEventRule" placeholder="请描述热事件报警规则，例如：&#10;当检测到以下任一条件时触发报警：&#10;1. 单体温度超过阈值且持续N秒&#10;2. 温升速率超过X ℃/min&#10;3. 温度分布异常偏差超过Y℃"></textarea></div>
+                    <div class="form-group"><label>总电压计算方式</label><input type="text" id="voltageCalcMethod" placeholder="请输入总电压计算方式"></div>
+                    <div class="form-group"><label>驱动电机最大工作电流(A)</label><input type="number" id="motorMaxCurrent" placeholder="请输入最大工作电流"></div>
+                </div>
+            </div>
+
+            <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">取 消</button><button class="btn btn-primary" onclick="saveData()">保 存</button></div>
+        </div>
+    </div>
+
+    <!-- 新增/编辑弹窗 - 车型配置信息 -->
+    <div class="modal" id="dataModalV">
+        <div class="modal-content" style="max-width:1400px;">
+            <div class="modal-header"><h2 id="modalTitleV">新增车型配置信息</h2><button class="close-btn" onclick="closeModalV()">✕</button></div>
+            <div id="vModalBody"></div>
+            <div class="modal-footer"><button class="btn btn-outline" onclick="closeModalV()">取 消</button><button class="btn btn-primary" onclick="saveDataV()">保 存</button></div>
+        </div>
+    </div>
+
+    <!-- 导入数据弹窗 - 车型配置信息 -->
+    <div class="modal" id="importModalV">
+        <div class="modal-content" style="max-width:480px;">
+            <div class="modal-header"><h2>导入车型配置数据</h2><button class="close-btn" onclick="closeImportDialogV()">✕</button></div>
+            <div style="padding:20px 0;">
+                <div class="form-group"><label>选择文件</label>
+                    <div style="display:flex;gap:10px;align-items:stretch;">
+                        <input type="text" id="importFilePathV" readonly placeholder="请选择文件" style="flex:1;padding:10px 14px;border:2px solid #e2e8f0;border-radius:7px;font-size:13px;background:#f8fafc;color:#64748b;">
+                        <button class="btn btn-outline" onclick="selectFileForImportV()" style="white-space:nowrap;">选择文件</button>
+                    </div>
+                    <div id="importFileNameV" style="margin-top:8px;font-size:12px;color:#64748b;">未选择文件</div>
+                </div>
+                <div style="margin-top:16px;padding:14px;background:#fefce8;border:1px solid #fde68a;border-radius:8px;">
+                    <div style="font-size:13px;font-weight:600;color:#a16207;margin-bottom:6px;">导入说明</div>
+                    <ul style="margin:0;padding-left:18px;font-size:12px;color:#854d0e;line-height:1.8;">
+                        <li>支持 .csv 格式文件，请先下载模板并按格式填写</li>
+                        <li>导入后将追加到现有数据中，不会覆盖已有记录</li>
+                        <li>文件编码请使用 UTF-8，避免乱码问题</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer" style="border:none;padding-top:0;"><button class="btn btn-outline" onclick="closeImportDialogV()">取 消</button><button class="btn btn-primary" onclick="confirmImportV()">确 定 导 入</button></div>
+        </div>
+    </div>
+
+    <!-- Toast提示 -->
+    <div class="toast" id="toast"><span id="toastIcon"></span><span id="toastMessage"></span></div>
+
+    <script>
+        // 生成默认3级报警值
+        function createAlarmLevels(baseVal, variance = 0) {
+            return { l1_min: baseVal - variance * 2, l1_max: baseVal - variance, l2_min: baseVal - variance, l2_max: baseVal, l3_min: baseVal, l3_max: baseVal + variance };
+        }
+
+        let dataList = [
+            { id: 1, vehicleName: 'FD5039XXYBEV', protocol: 'GB/T 32960-2016',
+              tempDiff: createAlarmLevels(10,3), batteryHighTemp: createAlarmLevels(55,5),
+              storageOverV: createAlarmLevels(440,5), storageUnderV: createAlarmLevels(290,10),
+              socLow: createAlarmLevels(25,5), parallelOverV: createAlarmLevels(4.18,0.04), parallelUnderV: createAlarmLevels(2.88,0.08),
+              socHigh: createAlarmLevels(91,3), socJump: createAlarmLevels(8,3), parallelDiff: createAlarmLevels(42,8), insulation: createAlarmLevels(520,60),
+              dcDcTemp: createAlarmLevels(78,5), motorCtrlTemp: createAlarmLevels(84,4), motorTemp: createAlarmLevels(112,6),
+              storageOverCharge: createAlarmLevels(422,5), motorOverSpeed: createAlarmLevels(280,20), motorOverCurrent: createAlarmLevels(370,30),
+              thermalEventRule: '单体温度≥65℃且持续10秒触发1级；温升≥3℃/min触发2级；多点温差≥15℃触发3级',
+              voltageCalcMethod: '单体电压累加', motorMaxCurrent: 450, uploadToNational: '是',
+              updateTime: '2026-07-15 14:32', operator: '张工', status: 'active' },
+            { id: 2, vehicleName: 'FD5038XXYBEV', protocol: 'GB/T 32960-2016',
+              tempDiff: createAlarmLevels(8,2), batteryHighTemp: createAlarmLevels(52,4),
+              storageOverV: createAlarmLevels(450,6), storageUnderV: createAlarmLevels(300,8),
+              socLow: createAlarmLevels(20,4), parallelOverV: createAlarmLevels(4.14,0.03), parallelUnderV: createAlarmLevels(2.92,0.06),
+              socHigh: createAlarmLevels(89,3), socJump: createAlarmLevels(6,2), parallelDiff: createAlarmLevels(38,6), insulation: createAlarmLevels(570,50),
+              dcDcTemp: createAlarmLevels(74,4), motorCtrlTemp: createAlarmLevels(79,4), motorTemp: createAlarmLevels(107,5),
+              storageOverCharge: createAlarmLevels(432,6), motorOverSpeed: createAlarmLevels(300,18), motorOverCurrent: createAlarmLevels(390,28),
+              thermalEventRule: '检测到热失控征兆立即上报：单体电压骤降、局部高温聚集、烟雾异常',
+              voltageCalcMethod: 'BMS上报值', motorMaxCurrent: 520, uploadToNational: '是',
+              updateTime: '2026-07-15 11:20', operator: '李工', status: 'active' },
+            { id: 3, vehicleName: 'FD5037XXYBEV', protocol: 'GB/T 32960-2016',
+              tempDiff: createAlarmLevels(12,4), batteryHighTemp: createAlarmLevels(58,6),
+              storageOverV: createAlarmLevels(445,6), storageUnderV: createAlarmLevels(285,12),
+              socLow: createAlarmLevels(23,6), parallelOverV: createAlarmLevels(4.21,0.05), parallelUnderV: createAlarmLevels(2.83,0.08),
+              socHigh: createAlarmLevels(93,3), socJump: createAlarmLevels(10,3), parallelDiff: createAlarmLevels(48,8), insulation: createAlarmLevels(495,55),
+              dcDcTemp: createAlarmLevels(82,5), motorCtrlTemp: createAlarmLevels(88,5), motorTemp: createAlarmLevels(118,6),
+              storageOverCharge: createAlarmLevels(427,5), motorOverSpeed: createAlarmLevels(260,18), motorOverCurrent: createAlarmLevels(355,28),
+              thermalEventRule: '热事件分级响应：一级预警→二级告警→三级紧急制动',
+              voltageCalcMethod: '单体电压累加', motorMaxCurrent: 480, uploadToNational: '否',
+              updateTime: '2026-07-14 16:45', operator: '王工', status: 'pending' },
+            { id: 4, vehicleName: 'FD5036XXYBEV', protocol: 'GB/T 32960-2025',
+              tempDiff: createAlarmLevels(6,2), batteryHighTemp: createAlarmLevels(48,4),
+              storageOverV: createAlarmLevels(435,5), storageUnderV: createAlarmLevels(310,10),
+              socLow: createAlarmLevels(30,5), parallelOverV: createAlarmLevels(4.11,0.03), parallelUnderV: createAlarmLevels(2.95,0.05),
+              socHigh: createAlarmLevels(88,3), socJump: createAlarmLevels(5,2), parallelDiff: createAlarmLevels(34,5), insulation: createAlarmLevels(620,50),
+              dcDcTemp: createAlarmLevels(69,4), motorCtrlTemp: createAlarmLevels(74,4), motorTemp: createAlarmLevels(103,5),
+              storageOverCharge: createAlarmLevels(415,5), motorOverSpeed: createAlarmLevels(330,20), motorOverCurrent: createAlarmLevels(420,30),
+              thermalEventRule: '氢燃料需监测储氢罐温度、电堆温度、冷却液等多维度指标',
+              voltageCalcMethod: 'BMS上报值', motorMaxCurrent: 580, uploadToNational: '是',
+              updateTime: '2026-07-14 09:18', operator: '赵工', status: 'active' },
+            { id: 5, vehicleName: 'FD5035XXYBEV', protocol: 'GB/T 32960-2016',
+              tempDiff: createAlarmLevels(14,4), batteryHighTemp: createAlarmLevels(62,6),
+              storageOverV: createAlarmLevels(440,5), storageUnderV: createAlarmLevels(278,12),
+              socLow: createAlarmLevels(27,6), parallelOverV: createAlarmLevels(4.25,0.05), parallelUnderV: createAlarmLevels(2.78,0.08),
+              socHigh: createAlarmLevels(95,3), socJump: createAlarmLevels(13,3), parallelDiff: createAlarmLevels(54,8), insulation: createAlarmLevels(465,55),
+              dcDcTemp: createAlarmLevels(86,5), motorCtrlTemp: createAlarmLevels(91,5), motorTemp: createAlarmLevels(124,6),
+              storageOverCharge: createAlarmLevels(420,5), motorOverSpeed: createAlarmLevels(245,18), motorOverCurrent: createAlarmLevels(335,28),
+              thermalEventRule: '经济版采用简化策略，主要依赖BMS内置算法判断',
+              voltageCalcMethod: '单体电压累加', motorMaxCurrent: 380, uploadToNational: '否',
+              updateTime: '2026-07-13 15:07', operator: '张工', status: 'pending' }
+        ];
+
+        let editingId = null;
+
+        // 将报警对象格式化为合并字符串: L1下,L1上;L2下,L2上;L3下,L3上
+        function formatAlarmValue(obj) {
+            if (!obj || typeof obj !== 'object') return '-';
+            const fmt = (val) => val === null || val === undefined ? '-' : (Number.isInteger(Number(val)) ? Number(val).toString() : Number(val).toFixed(val < 1 ? (val < 0.1 ? 3 : 2) : 1).replace(/\.?0+$/,''));
+            return `${fmt(obj.l1_min)},${fmt(obj.l1_max)};${fmt(obj.l2_min)},${fmt(obj.l2_max)};${fmt(obj.l3_min)},${fmt(obj.l3_max)}`;
+        }
+
+        function renderTable(data = dataList) {
+            const tbody = document.getElementById('tableBody');
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="27" style="padding:0;border:none;"><div class="empty-state"><div class="icon">📭</div><h3>暂无数据</h3><p>点击"新增配置"按钮添加数据，或使用导入功能批量导入</p></div></td></tr>`;
+                document.getElementById('totalRecords').textContent = '0';
+                return;
+            }
+
+            tbody.innerHTML = data.map((item, i) => `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td><span class="field-name">${item.vehicleName}</span></td>
+                    <td>${item.protocol||'-'}</td>
+                    <td><span class="alarm-value-cell" title="${item.vehicleName} - 温度差异报警">${formatAlarmValue(item.tempDiff)}</span></td>
+                    <td><span class="alarm-value-cell">${formatAlarmValue(item.batteryHighTemp)}</span></td>
+                    <td><span class="alarm-value-cell">${formatAlarmValue(item.storageOverV)}</span></td>
+                    <td><span class="alarm-value-cell">${formatAlarmValue(item.storageUnderV)}</span></td>
+                    <td><span class="alarm-value-cell">${formatAlarmValue(item.socLow)}</span></td>
+                    <td><span class="alarm-value-cell">${formatAlarmValue(item.parallelOverV)}</span></td>
+                    <td><span class="alarm-value-cell">${formatAlarmValue(item.parallelUnderV)}</span></td>
+                    <td><span class="alarm-value-cell">${formatAlarmValue(item.socHigh)}</span></td>
+                    <td><span class="alarm-value-cell">${formatAlarmValue(item.socJump)}</span></td>
+                    <td><span class="alarm-value-cell">${formatAlarmValue(item.parallelDiff)}</span></td>
+                    <td><span class="alarm-value-cell">${formatAlarmValue(item.insulation)}</span></td>
+                    <td><span class="alarm-value-cell">${formatAlarmValue(item.dcDcTemp)}</span></td>
+                    <td><span class="alarm-value-cell">${formatAlarmValue(item.motorCtrlTemp)}</span></td>
+                    <td><span class="alarm-value-cell">${formatAlarmValue(item.motorTemp)}</span></td>
+                    <td><span class="alarm-value-cell">${formatAlarmValue(item.storageOverCharge)}</span></td>
+                    <td><span class="alarm-value-cell">${formatAlarmValue(item.motorOverSpeed)}</span></td>
+                    <td><span class="alarm-value-cell">${formatAlarmValue(item.motorOverCurrent)}</span></td>
+                    <td><span class="alarm-value-cell" title="${item.thermalEventRule || ''}" style="max-width:180px;display:inline-block;overflow:hidden;text-ellipsis;white-space:nowrap;">${item.thermalEventRule || '-'}</span></td>
+                    <td>${item.voltageCalcMethod||'-'}</td>
+                    <td>${item.motorMaxCurrent||'-'}</td>
+                    <td><span style="color:${item.uploadToNational==='是'?'#10b981':'#94a3b8'};font-weight:500;">${item.uploadToNational||'-'}</span></td>
+                    <td class="time-text">${item.updateTime||'-'}</td>
+                    <td class="operator-text">${item.operator||'-'}</td>
+                    <td><div class="action-btns"><button class="action-btn edit" onclick="editItem(${item.id})" title="编辑">编辑</button><button class="action-btn delete" onclick="deleteItem(${item.id})" title="删除">删除</button></div></td>
+                </tr>`).join('');
+            document.getElementById('totalRecords').textContent = data.length;
+        }
+
+        function openModal(id = null) {
+            editingId = id;
+            const modal = document.getElementById('dataModal');
+            const title = document.getElementById('modalTitle');
+            if (id) {
+                const item = dataList.find(d => d.id === id);
+                if (item) { title.textContent = '编辑报警阈值配置'; fillForm(item); }
+            } else { title.textContent = '新增报警阈值配置'; clearForm(); }
+            modal.classList.add('show');
+        }
+        function closeModal() { document.getElementById('dataModal').classList.remove('show'); editingId = null; }
+
+        function fillForm(item) {
+            document.getElementById('vehicleName').value = item.vehicleName||'';
+            if(document.getElementById('protocol'))document.getElementById('protocol').value=item.protocol||'';
+            function fill(prefix, obj) {
+                if(!obj)return;
+                ['l1','l2','l3'].forEach(l=>['min','max'].forEach(d=>{
+                    const el=document.getElementById(`${prefix}_${l}_${d}`);
+                    if(el) el.value=obj[`${l}_${d}`]??'';
+                }));
+            }
+            fill('tempDiff',item.tempDiff);fill('batteryHighTemp',item.batteryHighTemp);
+            fill('storageOverV',item.storageOverV);fill('storageUnderV',item.storageUnderV);
+            fill('socLow',item.socLow);fill('parallelOverV',item.parallelOverV);
+            fill('parallelUnderV',item.parallelUnderV);fill('socHigh',item.socHigh);
+            fill('socJump',item.socJump);fill('parallelDiff',item.parallelDiff);
+            fill('insulation',item.insulation);fill('dcDcTemp',item.dcDcTemp);
+            fill('motorCtrlTemp',item.motorCtrlTemp);fill('motorTemp',item.motorTemp);
+            fill('storageOverCharge',item.storageOverCharge);fill('motorOverSpeed',item.motorOverSpeed);
+            fill('motorOverCurrent',item.motorOverCurrent);
+            document.getElementById('thermalEventRule').value=item.thermalEventRule||'';
+            if(document.getElementById('voltageCalcMethod'))document.getElementById('voltageCalcMethod').value=item.voltageCalcMethod||'';
+            if(document.getElementById('motorMaxCurrent'))document.getElementById('motorMaxCurrent').value=item.motorMaxCurrent||'';
+            if(document.getElementById('uploadToNational'))document.getElementById('uploadToNational').value=item.uploadToNational||'';
+        }
+        function clearForm() {
+            document.querySelectorAll('.form-group input,.alarm-field-group input,#thermalEventRule').forEach(el=>el.value='');
+        }
+
+        function readAlarmField(prefix) {
+            const o={};
+            ['l1','l2','l3'].forEach(l=>['min','max'].forEach(d=>{const v=parseFloat(document.getElementById(`${prefix}_${l}_${d}`)?.value);o[`${l}_${d}`]=isNaN(v)?null:v;}));
+            return o;
+        }
+        function editItem(id){openModal(id);}
+        function deleteItem(id){if(confirm('确定要删除这条记录吗？')){dataList=dataList.filter(d=>d.id!==id);renderTable();showToast('删除成功！','success');}}
+
+        function saveData() {
+            const formData={
+                vehicleName:document.getElementById('vehicleName').value.trim(),
+                protocol:document.getElementById('protocol').value,
+                tempDiff:readAlarmField('tempDiff'),batteryHighTemp:readAlarmField('batteryHighTemp'),
+                storageOverV:readAlarmField('storageOverV'),storageUnderV:readAlarmField('storageUnderV'),
+                socLow:readAlarmField('socLow'),parallelOverV:readAlarmField('parallelOverV'),
+                parallelUnderV:readAlarmField('parallelUnderV'),socHigh:readAlarmField('socHigh'),
+                socJump:readAlarmField('socJump'),parallelDiff:readAlarmField('parallelDiff'),
+                insulation:readAlarmField('insulation'),dcDcTemp:readAlarmField('dcDcTemp'),
+                motorCtrlTemp:readAlarmField('motorCtrlTemp'),motorTemp:readAlarmField('motorTemp'),
+                storageOverCharge:readAlarmField('storageOverCharge'),motorOverSpeed:readAlarmField('motorOverSpeed'),
+                motorOverCurrent:readAlarmField('motorOverCurrent'),
+                thermalEventRule:document.getElementById('thermalEventRule').value.trim(),
+                voltageCalcMethod:document.getElementById('voltageCalcMethod').value,
+                motorMaxCurrent:parseFloat(document.getElementById('motorMaxCurrent').value)||0,
+                updateTime:new Date().toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}),
+                operator:'管理员'
+            };
+            if(!formData.vehicleName){showToast('请填写车辆配置名称！','error');return;}
+            if(editingId){const idx=dataList.findIndex(d=>d.id===editingId);if(idx!==-1){dataList[idx]={...dataList[idx],...formData};showToast('更新成功！','success');}}
+            else{const newId=Math.max(...dataList.map(d=>d.id),0)+1;dataList.push({id:newId,...formData});showToast('新增成功！','success');}
+            closeModal(); renderTable();
+        }
+
+        function downloadTemplate(){
+            const headers=['车辆配置名称','规约','温度差异报警(℃)','电池高温报警(℃)','车载储能装置类型过压报警(V)','车载储能装置类型欠压报警(V)','SOC低报警(%)','最小并联单元过压报警(V)','最小并联单元欠压报警(V)','SOC过高报警(%)','SOC跳变报警(%)','最小并联单元一致性差报警(Mv)','绝缘电阻失效报警(kΩ)','DC-DC温度报警(℃)','驱动电机控制器温度报警(℃)','驱动电机温度报警(℃)','车载储能装置类型过充报警(V)','驱动电机超速报警(r/s)','驱动电机过流报警(A)','可充电储能热事件报警','总电压计算方式','驱动电机最大工作电流(A)'];
+            const colCount = headers.length;
+            const wb = XLSX.utils.book_new();
+            const noteText = '说明：（该sheet页为报警阈值信息导入页）\n1 阈值信息录入格式为：1级报警下限，1级报警上限；2级报警下限，2级报警上限；3级报警下限，3级报警上限\n2 可充电储能装置热事件报警：清晰阐述报警规则，格式无特定要求\n3 规约为GB/T 32960-2016车辆配置名称可不填写驱动电机超速报警、驱动电机过流报警、可充电储能装置热事件报警\n4 总电压计算方式：阐述计算方法即可，格式无特定要求';
+            const wsData = [];
+            wsData.push([noteText]);
+            wsData.push([]);
+            wsData.push(headers);
+            wsData.push(['FD5039XXYBEV','GB/T 32960-2016','6,8;8,10;10,14','48,54;54,60;60,66','434,442;442,450;450,458','310,300;300,290;290,280','30,25;25,20;20,15','4.10,4.16;4.16,4.20;4.20,4.26','3.00,2.96;2.96,2.88;2.88,2.78','87,91;91,93;93,95','4,7;7,10;10,14','32,42;42,50;50,60','620,570;570,520;520,460','68,76;76,84;84,92','78,86;86,92;92,98','104,114;114,122;122,132','412,424;424,432;432,440','250,280;280,310;310,350','330,370;370,410;410,460','单体温度≥65℃且持续10秒触发1级；温升≥3℃/min触发2级；多点温差≥15℃触发3级','单体电压累加','450']);
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:colCount-1}}];
+            ws['!cols'] = headers.map((h,i) => ({wch: i===0?16:i<19?14:h.length*2+4}));
+            if(!ws['A1'].s) ws['A1'].s={};
+            ws['A1'].s.fill={patternType:'solid',fgColor:{rgb:'FFFF00'}};
+            ws['A1'].s.font={bold:true,sz:11,color:{rgb:'CC0000'}};
+            ws['A1'].s.alignment={wrapText:true,vertical:'top'};
+            XLSX.utils.book_append_sheet(wb, ws, '报警阈值信息');
+            const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+            const blob = new Blob([wbout], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href=url; a.download='A6_报警阈值信息_模板.xlsx';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+            showToast('模板下载成功！','success');
+        }
+
+        function importData(event){
+            const file=event.target.files[0]; if(!file)return;
+            const reader=new FileReader();
+            reader.onload=function(e){
+                try{
+                    const text=e.target.result; const lines=text.split('\n').filter(l=>l.trim());
+                    if(lines.length<2){showToast('文件格式错误！','error');return;}
+                    let cnt=0;
+                    for(let i=1;i<lines.length;i++){
+                        const vals=parseCSVLine(lines[i]);
+                        if(vals.length>=19&&vals[0]&&vals[0]!=='示例车型A'){
+                            dataList.push({
+                                id:Math.max(...dataList.map(d=>d.id),0)+cnt+1,
+                                vehicleName:vals[0],
+                                tempDiff:parseMerged(vals[1]),batteryHighTemp:parseMerged(vals[2]),
+                                storageOverV:parseMerged(vals[3]),storageUnderV:parseMerged(vals[4]),
+                                socLow:parseMerged(vals[5]),parallelOverV:parseMerged(vals[6]),parallelUnderV:parseMerged(vals[7]),
+                                socHigh:parseMerged(vals[8]),socJump:parseMerged(vals[9]),
+                                parallelDiff:parseMerged(vals[10]),insulation:parseMerged(vals[11]),
+                                dcDcTemp:parseMerged(vals[12]),motorCtrlTemp:parseMerged(vals[13]),
+                                motorTemp:parseMerged(vals[14]),storageOverCharge:parseMerged(vals[15]),
+                                motorOverSpeed:parseMerged(vals[16]),motorOverCurrent:parseMerged(vals[17]),
+                                thermalEventRule:vals[18]||'',updateTime:new Date().toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}),
+                                operator:'导入用户',status:'pending'
+                            });cnt++;
+                        }
+                    }
+                    renderTable(); showToast(`成功导入 ${cnt} 条数据！`,'success');
+                }catch(err){console.error(err);showToast('导入失败，请检查文件格式！','error');}
+            };
+            reader.readAsText(file,'UTF-8'); event.target.value='';
+        }
+
+        // 解析合并格式字符串为levels对象
+        function parseMerged(str){
+            if(!str)return null;
+            const parts=str.split(';');
+            if(parts.length!==3)return null;
+            const parsePair=(s)=>{const p=s.split(',');return[p.length>=1?(parseFloat(p[0])||null):null,p.length>=2?(parseFloat(p[1])||null):null];};
+            const [l1min,l1max]=parsePair(parts[0]);
+            const [l2min,l2max]=parsePair(parts[1]);
+            const [l3min,l3max]=parsePair(parts[2]);
+            return{l1_min:l1min,l1_max:l1max,l2_min:l2min,l2_max:l2max,l3_min:l3min,l3_max:l3max};
+        }
+
+        function parseCSVLine(line){const r=[];let cur='',q=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"')q=!q;else if(c===','&&!q){r.push(cur.trim());cur='';}else cur+=c;}r.push(cur.trim());return r;}
+
+        function exportData(){
+            const headers=['车辆配置名称','温度差异报警(℃)','电池高温报警(℃)','储能过压(V)','储能欠压(V)','SOC低(%)','并联过压(V)','并联欠压(V)','SOC高(%)','SOC跳变(%)','一致性差(Mv)','绝缘电阻(kΩ)','DCDC温度(℃)','电机控温(℃)','电机温度(℃)','储能过充(V)','电机超速(r/s)','电机过流(A)','热事件规则','状态','更新时间','操作人'];
+            let csv='\uFEFF'+headers.join(',')+'\n';
+            dataList.forEach(item=>{
+                csv+=[item.vehicleName,
+                    formatAlarmValue(item.tempDiff),formatAlarmValue(item.batteryHighTemp),
+                    formatAlarmValue(item.storageOverV),formatAlarmValue(item.storageUnderV),
+                    formatAlarmValue(item.socLow),formatAlarmValue(item.parallelOverV),formatAlarmValue(item.parallelUnderV),
+                    formatAlarmValue(item.socHigh),formatAlarmValue(item.socJump),
+                    formatAlarmValue(item.parallelDiff),formatAlarmValue(item.insulation),
+                    formatAlarmValue(item.dcDcTemp),formatAlarmValue(item.motorCtrlTemp),formatAlarmValue(item.motorTemp),
+                    formatAlarmValue(item.storageOverCharge),formatAlarmValue(item.motorOverSpeed),formatAlarmValue(item.motorOverCurrent),
+                    `"${item.thermalEventRule||''}"`,item.status,item.updateTime,item.operator].join(',')+'\n';
+            });
+            const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const link=document.createElement('a'); link.href=URL.createObjectURL(blob); link.download=`A6_报警阈值信息_${new Date().toISOString().slice(0,10)}.csv`; link.click();
+            showToast('导出成功！','success');
+        }
+
+        function searchData(keyword){const f=dataList.filter(i=>i.vehicleName.toLowerCase().includes(keyword.toLowerCase()));renderTable(f);}
+
+        // ========== 筛选功能 ==========
+        let filteredData = [...dataList];
+
+        // 初始化车辆配置名称下拉框
+        function initFilterSelect() {
+            const select = document.getElementById('filterVehicleName');
+            select.innerHTML = '<option value="">全部</option>';
+            const names = [...new Set(dataList.map(d => d.vehicleName))].sort();
+            names.forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                select.appendChild(opt);
+            });
+        }
+
+        // 查询
+        function queryData() {
+            const val = document.getElementById('filterVehicleName').value;
+            if (val) {
+                filteredData = dataList.filter(d => d.vehicleName === val);
+            } else {
+                filteredData = [...dataList];
+            }
+            renderTable(filteredData);
+            showToast(`查询完成，共 ${filteredData.length} 条记录`, 'success');
+        }
+
+        // 重置筛选
+        function resetFilter() {
+            document.getElementById('filterVehicleName').value = '';
+            filteredData = [...dataList];
+            renderTable(filteredData);
+            showToast('已重置筛选条件', 'info');
+        }
+
+        // 下拉框选择变化时的提示
+        function onFilterChange() {
+            // 可选：选择后自动触发查询
+        }
+
+        function changePage(d){showToast(`分页功能演示：${d==='prev'?'上一页':'下一页'}`,'info');}
+        function showNavTip(n){showToast(`"${n}"模块开发中...`,'info');}
+
+        function showToast(m,type='info'){const t=document.getElementById('toast');document.getElementById('toastIcon').textContent={success:'✅',error:'❌',info:'ℹ️'}[type];document.getElementById('toastMessage').textContent=m;t.className=`toast show ${type}`;setTimeout(()=>t.classList.remove('show'),3000);}
+
+        // ========== 导航折叠与页面切换 ==========
+        function toggleNavParent(id) {
+            const el = document.getElementById(id);
+            el.classList.toggle('collapsed');
+        }
+
+        function switchPage(pageName, navEl) {
+            // 切换导航高亮
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            if (navEl) navEl.classList.add('active');
+
+            // 切换页面显示
+            document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
+            if (pageName === 'alarm') {
+                document.getElementById('pageAlarm').classList.add('active');
+                document.getElementById('breadcrumbCurrent').textContent = '报警阈值信息';
+            } else if (pageName === 'vehicle') {
+                document.getElementById('pageVehicle').classList.add('active');
+                document.getElementById('breadcrumbCurrent').textContent = '车型配置信息';
+                if (!vDataRendered) { renderTableV(); initFilterSelectV(); vDataRendered = true; }
+            }
+        }
+
+        // ========== 车型配置信息页面数据与逻辑 ==========
+        let vDataList = [
+            { id: 1,
+              enterprise: '浙江飞碟汽车制造企业', vehicleModel: 'FD5039XXYBEV', productName: '厢式货车',
+              commonName: 'FD5039XXYBEV', testOrg: '中汽中心(天津)', reportNo: 'WZ2025-01234', reportDoc: 'WZ2025-01234.pdf',
+              configName: 'FD5039XXYBEV', announcementBatch: '第382批', publishDate: '2025-03-15',
+              maxSpeed: 185, protocol: 'GB/T32960-2016', batteryType: '三元锂', driveMode: '纯电动', motorType: '永磁同步',
+              rangeTestMode: 'CLTC', pureRange: 605, ratedVoltage: 588, totalCapacity: 85.4, storageSeriesParallel: '串联',
+              gearRatios: '9.84/5.98/3.89/2.56/1.62/1.00', isSwapBattery: '否', isExtendedRange: '否', signAlg: 'SM2',
+              weight: 2120, length: 4980, width: 1910, height: 1495, batteryPackModel: 'BP-HAN-EV-A01', batteryPackCount: 1,
+              storageTotalEnergy: 85.4, storageCooling: '液冷', storageSeriesParallel2: '1P108S', storagePos: '底盘中部',
+              motorModel: 'TZ200XSMP-YM01', motorPos: '前轴', motorCooling: '液冷', motorRatedV: 400,
+              motorPeakPower: 163, motorMaxSpeed: 15000, motorPeakTorque: 330, motorMaxOutputTorque: 330,
+              terminalModel: 'T-BOX-V300', terminalBrand: '深圳有为', engineModel: '-', fuelType: '-',
+              fuelGrade: '-',               engineMaxPower: 0, engineMaxTorque: 0, uploadToNational: '是',
+              updateTime: '2026-07-15 14:32', operator: '张工' },
+            { id: 2,
+              enterprise: '浙江飞碟汽车制造企业', vehicleModel: 'FD5038XXYBEV', productName: '厢式货车',
+              commonName: 'FD5038XXYBEV', testOrg: '襄阳达安', reportNo: 'WZ2025-02345', reportDoc: 'WZ2025-02345.pdf',
+              configName: 'FD5038XXYBEV', announcementBatch: '第380批', publishDate: '2025-02-20',
+              maxSpeed: 225, protocol: 'GB/T32960-2016', batteryType: '磷酸铁锂', driveMode: '纯电动', motorType: '永磁同步+感应异步',
+              rangeTestMode: 'CLTC', pureRange: 710, ratedVoltage: 352, totalCapacity: 78.4, storageSeriesParallel: '并联',
+              gearRatios: '9.73/5.97/3.87/2.52/1.55/1.00/0.82/0.57', isSwapBattery: '否', isExtendedRange: '否', signAlg: 'SM2',
+              weight: 1820, length: 4694, width: 1849, height: 1443, batteryPackModel: 'M3-LR-BP02', batteryPackCount: 1,
+              storageTotalEnergy: 78.4, storageCooling: '液冷', storageSeriesParallel2: '2P96S', storagePos: '底盘下部',
+              motorModel: 'TM3-DUAL-M', motorPos: '前后双电机', motorCooling: '液冷', motorRatedV: 350,
+              motorPeakPower: 340, motorMaxSpeed: 19000, motorPeakTorque: 620, motorMaxOutputTorque: 620,
+              terminalModel: 'T-BOX-TSL4', terminalBrand: '深圳有为', engineModel: '-', fuelType: '-',
+              fuelGrade: '-',               engineMaxPower: 0, engineMaxTorque: 0, uploadToNational: '是',
+              updateTime: '2026-07-15 11:20', operator: '李工' },
+            { id: 3,
+              enterprise: '浙江飞碟汽车制造企业', vehicleModel: 'FD5037XXYBEV', productName: '厢式货车',
+              commonName: 'FD5037XXYBEV', testOrg: '长春检测中心', reportNo: 'WZ2025-03456', reportDoc: 'WZ2025-03456.pdf',
+              configName: 'FD5037XXYBEV', announcementBatch: '第378批', publishDate: '2025-01-08',
+              maxSpeed: 180, protocol: 'GB/T32960-2016', batteryType: '三元锂+磷酸铁锂', driveMode: '增程式', motorType: '永磁同步',
+              rangeTestMode: 'WLTC', pureRange: 215, ratedVoltage: 405.6, totalCapacity: 44.5, storageSeriesParallel: '串联',
+              gearRatios: '单速减速器', isSwapBattery: '否', isExtendedRange: '是', signAlg: 'SM2',
+              weight: 2560, length: 5218, width: 1998, height: 1800, batteryPackModel: 'L9-PHEV-BP01', batteryPackCount: 1,
+              storageTotalEnergy: 44.5, storageCooling: '液冷', storageSeriesParallel2: '1P126S', storagePos: '后轴前方',
+              motorModel: 'L9-FRONT-M01', motorPos: '前后双电机', motorCooling: '液冷', motorRatedV: 330,
+              motorPeakPower: 330, motorMaxSpeed: 16000, motorPeakTorque: 620, motorMaxOutputTorque: 620,
+              terminalModel: 'T-BOX-LI01', terminalBrand: '深圳有为',               engineModel: 'LXE15M', fuelType: '汽油',
+              fuelGrade: '95#',               engineMaxPower: 113, engineMaxOutputTorque: 210, uploadToNational: '否',
+              updateTime: '2026-07-14 16:45', operator: '王工' },
+            { id: 4,
+              enterprise: '浙江飞碟汽车制造企业', vehicleModel: 'FD5036XXYBEV', productName: '厢式货车',
+              commonName: 'FD5036XXYBEV', testOrg: '上海机动车检测中心', reportNo: 'WZ2025-04567', reportDoc: 'WZ2025-04567.pdf',
+              configName: 'FD5036XXYBEV', announcementBatch: '第376批', publishDate: '2024-12-18',
+              maxSpeed: 200, protocol: 'GB/T32960-2016', batteryType: '固态电池预研', driveMode: '纯电动', motorType: '感应异步+永磁同步',
+              rangeTestMode: 'CLTC', pureRange: 1050, ratedVoltage: 396, totalCapacity: 150, storageSeriesParallel: '串并混联',
+              gearRatios: '9.54/5.86/3.78/2.48/1.58/1.00', isSwapBattery: '是', isExtendedRange: '否', signAlg: 'SM3',
+              weight: 2380, length: 5101, width: 1987, height: 1509, batteryPackModel: 'ET7-150KWH-BP', batteryPackCount: 1,
+              storageTotalEnergy: 150, storageCooling: '液冷', storageSeriesParallel2: '2P108S', storagePos: '底盘一体式',
+              motorModel: 'ET7-DUAL-M', motorPos: '前后双电机', motorCooling: '液冷', motorRatedV: 370,
+              motorPeakPower: 480, motorMaxSpeed: 17000, motorPeakTorque: 850, motorMaxOutputTorque: 850,
+              terminalModel: 'T-BOX-NIO5', terminalBrand: '深圳有为',               engineModel: '-', fuelType: '氢气',
+              fuelGrade: '-',               engineMaxPower: 0, engineMaxTorque: 0, uploadToNational: '是',
+              updateTime: '2026-07-14 09:18', operator: '赵工' },
+            { id: 5,
+              enterprise: '浙江飞碟汽车制造企业', vehicleModel: 'FD5035XXYBEV', productName: '厢式货车',
+              commonName: 'FD5035XXYBEV', testOrg: '海南试验场', reportNo: 'WZ2025-05678', reportDoc: 'WZ2025-05678.pdf',
+              configName: 'FD5035XXYBEV', announcementBatch: '第374批', publishDate: '2024-11-25',
+              maxSpeed: 150, protocol: 'GB/T32960-2016', batteryType: '磷酸铁锂', driveMode: '纯电动', motorType: '永磁同步',
+              rangeTestMode: 'NEDC', pureRange: 420, ratedVoltage: 330, totalCapacity: 53, storageSeriesParallel: '串联',
+              gearRatios: '9.12/5.62/3.64/2.36/1.51/1.00', isSwapBattery: '否', isExtendedRange: '否', signAlg: 'SM2',
+              weight: 1650, length: 4432, width: 1834, height: 1560, batteryPackModel: 'GEELY-G6-BP', batteryPackCount: 1,
+              storageTotalEnergy: 53, storageCooling: '风冷+液冷', storageSeriesParallel2: '1P102S', storagePos: '底盘下方',
+              motorModel: 'GEELY-G6-M01', motorPos: '前轴', motorCooling: '风冷', motorRatedV: 310,
+              motorPeakPower: 100, motorMaxSpeed: 14000, motorPeakTorque: 220, motorMaxOutputTorque: 220,
+              terminalModel: 'T-BOX-GC01', terminalBrand: '深圳有为',               engineModel: '-', fuelType: '-',
+              fuelGrade: '-',               engineMaxPower: 0, engineMaxTorque: 0, uploadToNational: '否',
+              updateTime: '2026-07-13 15:07', operator: '张工' }
+        ];
+
+        let filteredVData = [...vDataList];
+        let editingIdV = null;
+        let vDataRendered = false;
+
+        const V_FIELDS = [
+            ['enterprise','车辆企业'],['vehicleModel','车辆型号'],['productName','产品名称'],['commonName','通用名称'],
+            ['testOrg','检测机构'],['reportNo','车型检验报告编号'],['reportDoc','车型检验报告文档'],
+            ['configName','车辆配置名称'],['announcementBatch','公告批次'],['publishDate','发布日期'],
+            ['maxSpeed','最高车速(Km/h)'],['protocol','规约'],['batteryType','电池种类'],['driveMode','动力方式'],
+            ['motorType','驱动电机种类'],['rangeTestMode','续驶里程检测方式'],['pureRange','纯电续驶里程(Km)'],
+            ['ratedVoltage','额定电压(V)'],['totalCapacity','总储电量(Kwh)'],['storageSeriesParallel','储能装置串并联方式'],
+            ['gearRatios','各挡位传动比'],['isSwapBattery','是否换电车辆'],['isExtendedRange','是否增程车辆'],
+            ['signAlg','签名算法'],['weight','车重(kg)'],['length','车长(mm)'],['width','车宽(mm)'],['height','车高(mm)'],
+            ['batteryPackModel','电池包(箱)型号'],['batteryPackCount','电池包(箱)数量'],
+            ['storageTotalEnergy','储能装置总能量(kwh)'],['storageCooling','储能装置冷却方式'],
+            ['storageSeriesParallel2','储能装置串并联方式'],['storagePos','储能装置位置'],
+            ['motorModel','驱动电机型号'],['motorPos','驱动电机位置'],['motorCooling','驱动电机冷却方式'],
+            ['motorRatedV','电机额定电压(V)'],['motorPeakPower','电机峰值功率(KW)'],
+            ['motorMaxSpeed','电机最高转速(r/min)'],['motorPeakTorque','电机峰值转矩(Nm)'],
+            ['motorMaxOutputTorque','电机最大输出转矩(Nm)'],['terminalModel','终端型号'],['terminalBrand','终端品牌'],
+            ['engineModel','发动机型号'],['fuelType','燃油类型'],['fuelGrade','燃油标号'],
+            ['engineMaxPower','最大输出功率(KW)'],['engineMaxOutputTorque','最大输出转矩(Nm)'],
+            ['uploadToNational','是否上传国家平台'],
+            ['updateTime','更新时间'],['operator','操作人']
+        ];
+
+        function renderTableV(data = filteredVData) {
+            const tbody = document.getElementById('tableBodyV');
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="56" style="padding:0;border:none;"><div class="empty-state"><div class="icon">📭</div><h3>暂无数据</h3><p>点击"新增"按钮添加数据，或使用导入功能批量导入</p></div></td></tr>`;
+                document.getElementById('totalRecordsV').textContent = '0';
+                return;
+            }
+            const lastTwoFields = V_FIELDS.slice(-2); // updateTime, operator
+            const otherFields = V_FIELDS.slice(0, -2);
+            tbody.innerHTML = data.map((item, i) => {
+                let fieldsHtml = '';
+                otherFields.forEach(([k]) => {
+                    if (k === 'reportDoc') {
+                        fieldsHtml += `<td><button class="action-btn edit" style="font-size:11px;" onclick="uploadReportDoc(${item.id}, '${item.vehicleModel||''}')">${item.reportDoc ? '📄 ' + item.reportDoc : '上传报告'}</button></td>`;
+                    } else if (k === 'uploadToNational') {
+                        fieldsHtml += `<td><span style="color:${item.uploadToNational==='是'?'#10b981':'#94a3b8'};font-weight:500;">${item.uploadToNational||'-'}</span></td>`;
+                    } else {
+                        fieldsHtml += `<td title="${item[k]||''}">${item[k] !== undefined && item[k] !== null && item[k] !== '' ? item[k] : '-'}</td>`;
+                    }
+                });
+                return `
+                <tr>
+                    <td>${i + 1}</td>
+                    ${fieldsHtml}
+                    <td class="time-text">${item.updateTime||'-'}</td>
+                    <td class="operator-text">${item.operator||'-'}</td>
+                    <td><div class="action-btns"><button class="action-btn edit" onclick="editItemV(${item.id})">编辑</button><button class="action-btn delete" onclick="deleteItemV(${item.id})">删除</button></div></td>
+                </tr>`;
+            }).join('');
+            document.getElementById('totalRecordsV').textContent = data.length;
+        }
+
+        function buildModalFormV() {
+            const groups = [
+                { title: '基本信息', fields: ['enterprise','车辆企业','vehicleModel','车辆型号','productName','产品名称','commonName','通用名称','testOrg','检测机构','configName','车辆配置名称','announcementBatch','公告批次','publishDate','发布日期'] },
+                { title: '检验报告', special: 'report' },
+                { title: '性能参数', fields: ['maxSpeed','最高车速(Km/h)','protocol','规约','batteryType','电池种类','driveMode','动力方式','motorType','驱动电机种类','rangeTestMode','续驶里程检测方式','pureRange','纯电续驶里程(Km)'] },
+                { title: '电池储能参数', fields: ['ratedVoltage','额定电压(V)','totalCapacity','总储电量(Kwh)','storageSeriesParallel','储能装置串并联方式','gearRatios','各挡位传动比','isSwapBattery','是否换电车辆:是|否','isExtendedRange','是否增程车辆:是|否','signAlg','签名算法'] },
+                { title: '车身尺寸', fields: ['weight','车重(kg)','length','车长(mm)','width','车宽(mm)','height','车高(mm)'] },
+                { title: '电池包详细参数', fields: ['batteryPackModel','电池包(箱)型号','batteryPackCount','电池包(箱)数量','storageTotalEnergy','储能装置总能量(kwh)','storageCooling','储能装置冷却方式','storagePos','储能装置位置'] },
+                { title: '驱动电机参数', fields: ['motorModel','驱动电机型号','motorPos','驱动电机位置','motorCooling','驱动电机冷却方式','motorRatedV','电机额定电压(V)','motorPeakPower','电机峰值功率(KW)','motorMaxSpeed','电机最高转速(r/min)','motorPeakTorque','电机峰值转矩(Nm)','motorMaxOutputTorque','电机最大输出转矩(Nm)'] },
+                { title: '终端与发动机', fields: ['terminalModel','终端型号','terminalBrand','终端品牌','engineModel','发动机型号','fuelType','燃油类型','fuelGrade','燃油标号','engineMaxPower','最大输出功率(KW)','engineMaxOutputTorque','最大输出转矩(Nm)'] }
+            ];
+            let html = '';
+            groups.forEach(g => {
+                if (g.special === 'report') {
+                    html += `<div class="form-section"><div class="form-section-title">${g.title}</div><div class="form-grid">`;
+                    html += `<div class="form-group"><label>车型检验报告编号 <span class="required">*</span></label><input type="text" id="v_reportNo" placeholder="请输入车型检验报告编号"></div>`;
+                    html += `<div class="form-group"><label>车型检验报告文档 <span class="required">*</span></label>
+                        <div style="display:flex;gap:10px;align-items:stretch;">
+                            <input type="text" id="v_reportDoc" readonly placeholder="未选择文件" style="flex:1;padding:10px 14px;border:2px solid #e2e8f0;border-radius:7px;font-size:13px;background:#f8fafc;color:#64748b;cursor:default;">
+                            <button type="button" class="btn btn-outline" onclick="document.getElementById('v_reportDocFileInput').click()" style="white-space:nowrap;">选择文件</button>
+                            <input type="file" id="v_reportDocFileInput" accept=".pdf,.doc,.docx" style="display:none;" onchange="handleReportDocUpload(this)">
+                        </div>
+                        <div id="v_reportDocFileName" style="margin-top:6px;font-size:12px;color:#64748b;"></div>
+                    </div>`;
+                    html += '</div></div>';
+                    return;
+                }
+                html += `<div class="form-section"><div class="form-section-title">${g.title}</div><div class="form-grid">`;
+                for (let i = 0; i < g.fields.length; i += 4) {
+                    const k0 = g.fields[i], l0 = g.fields[i+1];
+                    const isSelect0 = l0.includes(':');
+                    const [realL0, opts0] = isSelect0 ? l0.split(':') : [l0, null];
+                    if (isSelect0) {
+                        const optHtml0 = opts0.split('|').map(o => `<option value="${o}">${o}</option>`).join('');
+                        html += `<div class="form-group"><label>${realL0} <span class="required">*</span></label><select id="v_${k0}"><option value="">请选择</option>${optHtml0}</select></div>`;
+                    } else {
+                        html += `<div class="form-group"><label>${l0} <span class="required">*</span></label><input type="text" id="v_${k0}" placeholder="请输入${l0}"></div>`;
+                    }
+                    if (i + 2 < g.fields.length) {
+                        const k1 = g.fields[i+2], l1 = g.fields[i+3];
+                        const isSelect1 = l1.includes(':');
+                        const [realL1, opts1] = isSelect1 ? l1.split(':') : [l1, null];
+                        if (isSelect1) {
+                            const optHtml1 = opts1.split('|').map(o => `<option value="${o}">${o}</option>`).join('');
+                            html += `<div class="form-group"><label>${realL1} <span class="required">*</span></label><select id="v_${k1}"><option value="">请选择</option>${optHtml1}</select></div>`;
+                        } else {
+                            html += `<div class="form-group"><label>${l1} <span class="required">*</span></label><input type="text" id="v_${k1}" placeholder="请输入${l1}"></div>`;
+                        }
+                    } else {
+                        html += `<div class="form-group"></div>`;
+                    }
+                }
+                html += '</div></div>';
+            });
+            return html;
+        }
+
+        function openModalV(id = null) {
+            editingIdV = id;
+            const modal = document.getElementById('dataModalV');
+            const title = document.getElementById('modalTitleV');
+            const body = document.getElementById('vModalBody');
+            body.innerHTML = buildModalFormV();
+            if (id) {
+                const item = vDataList.find(d => d.id === id);
+                if (item) { title.textContent = '编辑车型配置信息'; fillFormV(item); }
+            } else { title.textContent = '新增车型配置信息'; }
+            modal.classList.add('show');
+        }
+        function closeModalV() { document.getElementById('dataModalV').classList.remove('show'); editingIdV = null; }
+
+        function fillFormV(item) {
+            V_FIELDS.forEach(([k]) => {
+                const el = document.getElementById(`v_${k}`);
+                if (el) el.value = item[k] || '';
+            });
+        }
+
+        function handleReportDocUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+            document.getElementById('v_reportDoc').value = file.name;
+            document.getElementById('v_reportDocFileName').textContent = '已选择: ' + file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
+            document.getElementById('v_reportDoc').setAttribute('data-filename', file.name);
+        }
+
+        function saveDataV() {
+            const formData = {};
+            let hasError = false;
+            V_FIELDS.forEach(([k, label]) => {
+                const el = document.getElementById(`v_${k}`);
+                formData[k] = el ? el.value.trim() : '';
+                if (el && el.closest('.form-group')?.querySelector('.required') && !formData[k]) {
+                    hasError = true; showToast(`请填写${label}！`,'error');
+                }
+            });
+            // 自动填充更新时间和操作人
+            formData.updateTime = new Date().toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+            formData.operator = '管理员';
+            if (hasError) return;
+            if (!formData.vehicleModel) { showToast('请填写车辆型号！','error'); return; }
+            if (editingIdV) {
+                const idx = vDataList.findIndex(d => d.id === editingIdV);
+                if (idx !== -1) { vDataList[idx] = { ...vDataList[idx], ...formData }; showToast('更新成功！','success'); }
+            } else {
+                const newId = Math.max(...vDataList.map(d => d.id), 0) + 1;
+                vDataList.push({ id: newId, ...formData }); showToast('新增成功！','success');
+            }
+            closeModalV(); filteredVData = [...vDataList]; renderTableV(); initFilterSelectV();
+        }
+
+        function editItemV(id){openModalV(id);}
+        function deleteItemV(id){if(confirm('确定要删除这条记录吗？')){vDataList=vDataList.filter(d=>d.id!==id);filteredVData=[...vDataList];renderTableV();showToast('删除成功！','success');}}
+
+        function initFilterSelectV() {
+            const select = document.getElementById('filterVModel');
+            select.innerHTML = '<option value="">全部</option>';
+            const models = [...new Set(vDataList.map(d => d.vehicleModel))].sort();
+            models.forEach(m => { const opt = document.createElement('option'); opt.value = m; opt.textContent = m; select.appendChild(opt); });
+        }
+
+        function queryDataV() {
+            const val = document.getElementById('filterVModel').value;
+            filteredVData = val ? vDataList.filter(d => d.vehicleModel === val) : [...vDataList];
+            renderTableV(filteredVData);
+            showToast(`查询完成，共 ${filteredVData.length} 条记录`,'success');
+        }
+
+        function resetFilterV() {
+            document.getElementById('filterVModel').value = '';
+            filteredVData = [...vDataList];
+            renderTableV();
+            showToast('已重置筛选条件','info');
+        }
+
+        function onFilterChangeV() {}
+
+        // ========== 车型配置信息 - 独立导入弹窗 ==========
+        let importFileDataV = null;
+
+        function openImportDialogV() {
+            const modal = document.getElementById('importModalV');
+            document.getElementById('importFileNameV').textContent = '未选择文件';
+            document.getElementById('importFilePathV').value = '';
+            importFileDataV = null;
+            modal.classList.add('show');
+        }
+
+        function closeImportDialogV() {
+            document.getElementById('importModalV').classList.remove('show');
+            importFileDataV = null;
+        }
+
+        function selectFileForImportV() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.xlsx,.xls,.csv';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                document.getElementById('importFileNameV').textContent = file.name;
+                const reader = new FileReader();
+                reader.onload = function(ev) {
+                    importFileDataV = ev.target.result;
+                };
+                reader.readAsText(file, 'UTF-8');
+            };
+            input.click();
+        }
+
+        function confirmImportV() {
+            if (!importFileDataV) {
+                showToast('请先选择文件！', 'error'); return;
+            }
+            try {
+                const lines = importFileDataV.split('\n').filter(l => l.trim());
+                if (lines.length < 2) { showToast('文件格式错误！', 'error'); closeImportDialogV(); return; }
+                let cnt = 0;
+                for (let i = 1; i < lines.length; i++) {
+                    const vals = parseCSVLine(lines[i]);
+                    if (vals.length >= 50 && vals[0] && vals[0] !== '示例车企A') {
+                        const obj = { id: Math.max(...vDataList.map(d => d.id), 0) + cnt + 1 };
+                        V_FIELDS.forEach(([k, idx]) => { obj[k] = vals[idx] || ''; });
+                        vDataList.push(obj); cnt++;
+                    }
+                }
+                filteredVData = [...vDataList]; renderTableV(); initFilterSelectV();
+                closeImportDialogV();
+                showToast(`成功导入 ${cnt} 条数据！`, 'success');
+            } catch (err) { console.error(err); showToast('导入失败，请检查文件格式！', 'error'); }
+        }
+
+        function downloadTemplateV() {
+            const templateFields = V_FIELDS.slice(0, -3);
+            const headers = templateFields.map(([,l])=>l);
+            const colCount = headers.length;
+            const wb = XLSX.utils.book_new();
+            const noteText = '说明：（该sheet页为车型配置信息导入页）\n1 规约从以下进行选择：GB/T 32960-2016，GB/T 32960-2025\n2 电池包(箱)串并联方式格式xPyS 或者 xSyP。若有多种串并联方式，则以中文逗号隔开\n3 额定电压指储能装置总成标称电压\n4 规约为GB/T 32960-2016车辆可不填写签名算法\n5 非插电式混和动力汽车可不填写燃油信息';
+            const wsData = [];
+            wsData.push([noteText]);
+            wsData.push([]);
+            wsData.push(headers);
+            wsData.push(['浙江飞碟汽车制造企业','FD5039XXYBEV','厢式货车','FD5039XXYBEV','中汽中心(天津)','WZ2025-01234','WZ2025-01234.pdf','FD5039XXYBEV','第382批','2025-03-15','185','GB/T 32960-2016','三元锂','纯电动','永磁同步','CLTC','605','588','85.4','串联','9.84/5.98/3.89/2.56/1.62/1.00','否','否','SM2','2120','4980','1910','1495','BP-HAN-EV-A01','1','85.4','液冷','1P108S','底盘中部','TZ200XSMP-YM01','前轴','液冷','400','163','15000','330','330','T-BOX-V300','深圳有为','-','-','-','0','0']);
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:colCount-1}}];
+            ws['!cols'] = headers.map(h => ({wch: Math.max(h.length*2+4,10)}));
+            if(!ws['A1'].s) ws['A1'].s={};
+            ws['A1'].s.fill={patternType:'solid',fgColor:{rgb:'FFFF00'}};
+            ws['A1'].s.font={bold:true,sz:11,color:{rgb:'CC0000'}};
+            ws['A1'].s.alignment={wrapText:true,vertical:'top'};
+            XLSX.utils.book_append_sheet(wb, ws, '车型配置信息');
+            const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+            const blob = new Blob([wbout], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href=url; a.download='A7_车型配置信息_模板.xlsx';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+            showToast('模板下载成功！','success');
+        }
+
+        function importDataV(event) {
+            const file = event.target.files[0]; if(!file)return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const text = e.target.result; const lines = text.split('\n').filter(l=>l.trim());
+                    if(lines.length<2){showToast('文件格式错误！','error');return;}
+                    let cnt=0;
+                    for(let i=1;i<lines.length;i++){
+                        const vals = parseCSVLine(lines[i]);
+                        if(vals.length>=50 && vals[0] && vals[0]!=='示例车企A'){
+                            const obj={id:Math.max(...vDataList.map(d=>d.id),0)+cnt+1};
+                            V_FIELDS.forEach(([k,idx])=>{obj[k]=vals[idx]||'';});
+                            vDataList.push(obj);cnt++;
+                        }
+                    }
+                    filteredVData=[...vDataList];renderTableV();initFilterSelectV();
+                    showToast(`成功导入 ${cnt} 条数据！`,'success');
+                } catch(err){console.error(err);showToast('导入失败，请检查文件格式！','error');}
+            };
+            reader.readAsText(file,'UTF-8'); event.target.value='';
+        }
+
+        function exportDataV() {
+            const headers = V_FIELDS.map(([,l])=>l);
+            let csv='\uFEFF'+headers.join(',')+'\n';
+            vDataList.forEach(item=>{
+                csv+=V_FIELDS.map(([k])=>`"${item[k]||''}"`).join(',')+'\n';
+            });
+            const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+            const link=document.createElement('a'); link.href=URL.createObjectURL(blob);
+            link.download=`A7_车型配置信息_${new Date().toISOString().slice(0,10)}.csv`; link.click();
+            showToast('导出成功！','success');
+        }
+
+        // 上传车型检验文档
+        function handleInspectDocUpload(event) {
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
+            
+            let validCount = 0;
+            const allowedTypes = ['application/pdf', 'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+            
+            for (const file of files) {
+                if (allowedTypes.includes(file.type) || /\.(pdf|doc|docx|xlsx|xls)$/i.test(file.name)) {
+                    validCount++;
+                }
+            }
+            
+            if (validCount > 0) {
+                showToast(`已选择 ${validCount} 个检验文档文件，准备上传...`, 'success');
+                // TODO: 此处可接入实际的上传API逻辑
+                // 示例: 将文件通过FormData发送到后端
+                /*
+                const formData = new FormData();
+                for (const file of files) formData.append('inspectDocs', file);
+                fetch('/api/vehicle/inspect-docs/upload', { method:'POST', body:formData })
+                    .then(r=>r.json()).then(d=>{
+                        if(d.success) showToast('检验文档上传成功！','success');
+                        else showToast('上传失败：'+d.message,'error');
+                    }).catch(()=>showToast('网络错误','error'));
+                */
+            } else {
+                showToast('请选择有效的文档文件（PDF/Word/Excel）','error');
+            }
+            event.target.value = '';  // 重置以便重复选择同一文件
+        }
+
+        window.onload=()=>{renderTable();initFilterSelect();}
+    </script>
+</body>
+</html>
