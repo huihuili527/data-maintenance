@@ -204,6 +204,10 @@
             box-shadow: none;
         }
         .btn-info:hover { background: #eef2ff; border-color: #6366f1; transform: none; }
+        /* 表格复选框 */
+        th input[type="checkbox"], td input[type="checkbox"] {
+            width: 16px; height: 16px; cursor: pointer; accent-color: #0e7ce6;
+        }
         .search-box { margin-left: auto; position: relative; }
         .search-box input { width: 240px; padding: 9px 16px 9px 38px; border: 2px solid #e2e8f0; border-radius: 7px; font-size: 13px; transition: all 0.25s ease; background: #f8fafc; }
         .search-box input:focus { outline: none; border-color: #0e7ce6; background: white; box-shadow: 0 0 0 3px rgba(14,124,230,0.12); }
@@ -344,9 +348,8 @@
                 <div class="logo-icon">
                     <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                 </div>
-                <span class="logo-text">新能源监管平台</span>
+                <span class="logo-text">新能源平台</span>
             </div>
-            <div class="logo-subtitle">数据维护系统</div>
         </div>
         <nav class="sidebar-nav">
             <div class="nav-parent" id="navDataMaintain">
@@ -386,6 +389,9 @@
                 <button class="btn btn-warning" onclick="document.getElementById('fileInput').click()">导入数据</button>
                 <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="importData(event)">
                 <button class="btn btn-outline" onclick="exportData()">导出数据</button>
+                <label class="btn btn-info">上 传
+                    <input type="file" id="uploadFileAlarm" accept=".xlsx,.xls,.csv" multiple style="display:none;" onchange="handleUploadData(event, 'alarm')">
+                </label>
             </div>
         </div>
 
@@ -394,6 +400,7 @@
             <table>
                 <thead>
                     <tr>
+                        <th style="width:40px;text-align:center;"><input type="checkbox" id="checkAllAlarm" onclick="toggleCheckAll('alarm', this)"></th>
                         <th style="width:46px;">序号</th>
                         <th style="width:130px;">车辆配置名称</th>
                         <th>规约</th>
@@ -457,8 +464,8 @@
                 <button class="btn btn-success" onclick="downloadTemplateV()">模板下载</button>
                 <button class="btn btn-warning" onclick="openImportDialogV()">导入数据</button>
                 <button class="btn btn-outline" onclick="exportDataV()">导出数据</button>
-                <label class="btn btn-info">上传检验文档
-                    <input type="file" id="uploadInspectDoc" accept=".pdf,.doc,.docx,.xlsx,.xls" multiple style="display:none;" onchange="handleInspectDocUpload(event)">
+                <label class="btn btn-info">上 传
+                    <input type="file" id="uploadFileVehicle" accept=".xlsx,.xls,.csv" multiple style="display:none;" onchange="handleUploadData(event, 'vehicle')">
                 </label>
             </div>
         </div>
@@ -468,6 +475,7 @@
             <table style="min-width:4200px;">
                 <thead>
                     <tr>
+                        <th style="width:40px;text-align:center;"><input type="checkbox" id="checkAllVehicle" onclick="toggleCheckAll('vehicle', this)"></th>
                         <th style="width:46px;">序号</th>
                         <th style="width:120px;">车辆企业</th>
                         <th style="width:130px;">车辆型号</th>
@@ -716,13 +724,14 @@
         function renderTable(data = dataList) {
             const tbody = document.getElementById('tableBody');
             if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="27" style="padding:0;border:none;"><div class="empty-state"><div class="icon">📭</div><h3>暂无数据</h3><p>点击"新增配置"按钮添加数据，或使用导入功能批量导入</p></div></td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="28" style="padding:0;border:none;"><div class="empty-state"><div class="icon">📭</div><h3>暂无数据</h3><p>点击"新增配置"按钮添加数据，或使用导入功能批量导入</p></div></td></tr>`;
                 document.getElementById('totalRecords').textContent = '0';
                 return;
             }
 
             tbody.innerHTML = data.map((item, i) => `
                 <tr>
+                    <td style="text-align:center;"><input type="checkbox" class="row-check-alarm" value="${item.id}" onchange="updateCheckAllState('alarm')"></td>
                     <td>${i + 1}</td>
                     <td><span class="field-name">${item.vehicleName}</span></td>
                     <td>${item.protocol||'-'}</td>
@@ -749,7 +758,7 @@
                     <td><span style="color:${item.uploadToNational==='是'?'#10b981':'#94a3b8'};font-weight:500;">${item.uploadToNational||'-'}</span></td>
                     <td class="time-text">${item.updateTime||'-'}</td>
                     <td class="operator-text">${item.operator||'-'}</td>
-                    <td><div class="action-btns"><button class="action-btn edit" onclick="editItem(${item.id})" title="编辑">编辑</button><button class="action-btn delete" onclick="deleteItem(${item.id})" title="删除">删除</button></div></td>
+                    <td><div class="action-btns"><button class="action-btn edit" onclick="editItem(${item.id})" title="编辑">编辑</button><button class="action-btn delete" onclick="deleteItem(${item.id})" title="删除"${item.uploadToNational==='是' ? ' disabled style="opacity:0.35;cursor:not-allowed;"' : ''}>删除</button></div></td>
                 </tr>`).join('');
             document.getElementById('totalRecords').textContent = data.length;
         }
@@ -800,7 +809,7 @@
             return o;
         }
         function editItem(id){openModal(id);}
-        function deleteItem(id){if(confirm('确定要删除这条记录吗？')){dataList=dataList.filter(d=>d.id!==id);renderTable();showToast('删除成功！','success');}}
+        function deleteItem(id){const item=dataList.find(d=>d.id===id); if(item&&item.uploadToNational==='是'){showToast('该数据已上传国家平台，不允许删除！','error');return;}if(confirm('确定要删除这条记录吗？')){dataList=dataList.filter(d=>d.id!==id);renderTable();showToast('删除成功！','success');}}
 
         function saveData() {
             const formData={
@@ -1092,7 +1101,7 @@
         function renderTableV(data = filteredVData) {
             const tbody = document.getElementById('tableBodyV');
             if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="56" style="padding:0;border:none;"><div class="empty-state"><div class="icon">📭</div><h3>暂无数据</h3><p>点击"新增"按钮添加数据，或使用导入功能批量导入</p></div></td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="57" style="padding:0;border:none;"><div class="empty-state"><div class="icon">📭</div><h3>暂无数据</h3><p>点击"新增"按钮添加数据，或使用导入功能批量导入</p></div></td></tr>`;
                 document.getElementById('totalRecordsV').textContent = '0';
                 return;
             }
@@ -1111,11 +1120,12 @@
                 });
                 return `
                 <tr>
+                    <td style="text-align:center;"><input type="checkbox" class="row-check-vehicle" value="${item.id}" onchange="updateCheckAllState('vehicle')"></td>
                     <td>${i + 1}</td>
                     ${fieldsHtml}
                     <td class="time-text">${item.updateTime||'-'}</td>
                     <td class="operator-text">${item.operator||'-'}</td>
-                    <td><div class="action-btns"><button class="action-btn edit" onclick="editItemV(${item.id})">编辑</button><button class="action-btn delete" onclick="deleteItemV(${item.id})">删除</button></div></td>
+                    <td><div class="action-btns"><button class="action-btn edit" onclick="editItemV(${item.id})">编辑</button><button class="action-btn delete" onclick="deleteItemV(${item.id})" title="删除"${item.uploadToNational==='是' ? ' disabled style="opacity:0.35;cursor:not-allowed;"' : ''}>删除</button></div></td>
                 </tr>`;
             }).join('');
             document.getElementById('totalRecordsV').textContent = data.length;
@@ -1233,7 +1243,7 @@
         }
 
         function editItemV(id){openModalV(id);}
-        function deleteItemV(id){if(confirm('确定要删除这条记录吗？')){vDataList=vDataList.filter(d=>d.id!==id);filteredVData=[...vDataList];renderTableV();showToast('删除成功！','success');}}
+        function deleteItemV(id){const item=vDataList.find(d=>d.id===id); if(item&&item.uploadToNational==='是'){showToast('该数据已上传国家平台，不允许删除！','error');return;}if(confirm('确定要删除这条记录吗？')){vDataList=vDataList.filter(d=>d.id!==id);filteredVData=[...vDataList];renderTableV();showToast('删除成功！','success');}}
 
         function initFilterSelectV() {
             const select = document.getElementById('filterVModel');
@@ -1375,39 +1385,46 @@
             showToast('导出成功！','success');
         }
 
-        // 上传车型检验文档
-        function handleInspectDocUpload(event) {
+        // ========== 复选框全选/单选联动 ==========
+        function toggleCheckAll(page, el) {
+            const cls = page === 'alarm' ? 'row-check-alarm' : 'row-check-vehicle';
+            document.querySelectorAll('.' + cls).forEach(cb => cb.checked = el.checked);
+        }
+        function updateCheckAllState(page) {
+            const cls = page === 'alarm' ? 'row-check-alarm' : 'row-check-vehicle';
+            const allId = page === 'alarm' ? 'checkAllAlarm' : 'checkAllVehicle';
+            const cbs = document.querySelectorAll('.' + cls);
+            const allCb = document.getElementById(allId);
+            if (allCb) allCb.checked = [...cbs].every(cb => cb.checked);
+        }
+        function getSelectedIds(page) {
+            const cls = page === 'alarm' ? 'row-check-alarm' : 'row-check-vehicle';
+            return [...document.querySelectorAll('.' + cls + ':checked')].map(cb => parseInt(cb.value));
+        }
+
+        // ========== 上传功能 ==========
+        function handleUploadData(event, page) {
             const files = event.target.files;
             if (!files || files.length === 0) return;
-            
-            let validCount = 0;
-            const allowedTypes = ['application/pdf', 'application/msword',
-                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
-            
-            for (const file of files) {
-                if (allowedTypes.includes(file.type) || /\.(pdf|doc|docx|xlsx|xls)$/i.test(file.name)) {
-                    validCount++;
-                }
+            const selectedIds = getSelectedIds(page);
+            if (selectedIds.length === 0) {
+                showToast('请先勾选要上传的数据行！', 'error');
+                event.target.value = '';
+                return;
             }
-            
-            if (validCount > 0) {
-                showToast(`已选择 ${validCount} 个检验文档文件，准备上传...`, 'success');
-                // TODO: 此处可接入实际的上传API逻辑
-                // 示例: 将文件通过FormData发送到后端
-                /*
-                const formData = new FormData();
-                for (const file of files) formData.append('inspectDocs', file);
-                fetch('/api/vehicle/inspect-docs/upload', { method:'POST', body:formData })
-                    .then(r=>r.json()).then(d=>{
-                        if(d.success) showToast('检验文档上传成功！','success');
-                        else showToast('上传失败：'+d.message,'error');
-                    }).catch(()=>showToast('网络错误','error'));
-                */
-            } else {
-                showToast('请选择有效的文档文件（PDF/Word/Excel）','error');
-            }
-            event.target.value = '';  // 重置以便重复选择同一文件
+            showToast(`已选择 ${selectedIds.length} 条数据，${files.length} 个文件待上传...`, 'success');
+            // TODO: 接入实际的上传API
+            /*
+            const formData = new FormData();
+            formData.append('ids', selectedIds.join(','));
+            for (const f of files) formData.append('files', f);
+            fetch('/api/' + (page==='alarm'?'alarm':'vehicle') + '/upload', { method:'POST', body:formData })
+                .then(r=>r.json()).then(d=>{
+                    if(d.success) showToast('上传成功！','success');
+                    else showToast('上传失败：'+d.message,'error');
+                }).catch(()=>showToast('网络错误','error'));
+            */
+            event.target.value = '';
         }
 
         window.onload=()=>{renderTable();initFilterSelect();}
